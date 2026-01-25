@@ -48,3 +48,36 @@ Thumbs.db
 *.mov
 *.wmv
 
+## Portfolio analyzer additions here
+.env
+.env.local
+
+# Data and logs
+data/
+logs/
+backups/
+
+# SSL certificates
+nginx/ssl/*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.db-journal
