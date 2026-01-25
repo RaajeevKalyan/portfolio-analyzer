@@ -1,0 +1,27 @@
+# Web Framework
+Flask==3.0.0
+Werkzeug==3.0.1
+gunicorn==21.2.0
+
+# Database
+SQLAlchemy==2.0.23
+alembic==1.13.0
+
+# CSV Processing
+pandas==2.1.4
+numpy==1.26.2
+
+# ETF/MF Holdings Data
+mstarpy==8.0.3
+
+# Security
+Flask-WTF==1.2.1
+cryptography==41.0.7
+
+# HTTP Requests (for mstarpy and fallback scraper)
+requests==2.31.0
+beautifulsoup4==4.12.2
+lxml==4.9.4
+
+# Utilities
+python-dotenv==1.0.0

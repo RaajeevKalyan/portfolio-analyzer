@@ -1,4 +1,16 @@
-# Architecture - Portfolio Risk Analyzer
+### Aggregate Snapshot (NEW)
+```python
+class AggregateSnapshot(Model):
+    id: int (PK)
+    snapshot_date: datetime
+    total_value: decimal (sum across all brokers)
+    total_positions: int (sum across all brokers)
+    created_at: datetime
+    
+    # Relationships
+    portfolio_snapshots: List[PortfolioSnapshot] (via join table)
+    risk_metrics: RiskMetrics
+```# Architecture - Portfolio Risk Analyzer
 
 ## System Architecture Diagram
 
@@ -86,22 +98,22 @@ portfolio-analyzer/
 │   ├── config.py
 │   ├── models.py
 │   ├── database.py
-│   ├── encryption.py
 │   ├── main.py (Flask app entry)
 │   ├── routes/
 │   │   ├── __init__.py
-│   │   ├── auth.py (OAuth flows)
 │   │   ├── dashboard.py
+│   │   ├── upload.py (CSV upload handling)
 │   │   ├── portfolio.py
 │   │   ├── settings.py
 │   │   └── api.py (AJAX endpoints)
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── broker_base.py
-│   │   ├── schwab_broker.py
-│   │   ├── robinhood_broker.py
-│   │   ├── merrill_broker.py
-│   │   ├── fidelity_broker.py
+│   │   ├── csv_parser_base.py
+│   │   ├── merrill_csv_parser.py
+│   │   ├── fidelity_csv_parser.py
+│   │   ├── webull_csv_parser.py
+│   │   ├── robinhood_csv_parser.py
+│   │   ├── schwab_csv_parser.py
 │   │   ├── holdings_parser.py (mstarpy + fallback)
 │   │   ├── portfolio_aggregator.py
 │   │   └── risk_analyzer.py
@@ -152,16 +164,16 @@ class UserSettings(Model):
     updated_at: datetime
 ```
 
-### Broker Credentials
+### Broker Account
 ```python
-class BrokerCredential(Model):
+class BrokerAccount(Model):
     id: int (PK)
-    broker_name: str ('schwab' | 'robinhood' | 'merrill' | 'fidelity')
-    encrypted_access_token: bytes
-    encrypted_refresh_token: bytes
-    token_expires_at: datetime
+    broker_name: str ('merrill' | 'fidelity' | 'webull' | 'robinhood' | 'schwab')
+    account_number_last4: str (extracted from CSV, optional)
+    account_nickname: str (user-defined, optional)
+    last_uploaded_at: datetime
+    last_csv_filename: str
     is_active: bool
-    last_synced_at: datetime
     created_at: datetime
     updated_at: datetime
 ```
@@ -170,14 +182,17 @@ class BrokerCredential(Model):
 ```python
 class PortfolioSnapshot(Model):
     id: int (PK)
+    broker_account_id: int (FK -> BrokerAccount)
     snapshot_date: datetime
     total_value: decimal
     total_positions: int
+    upload_source: str ('csv_upload')
+    csv_filename: str
     created_at: datetime
     
     # Relationships
     holdings: List[Holding]
-    risk_metrics: RiskMetrics
+    # Note: RiskMetrics calculated across ALL broker snapshots, not per-broker
 ```
 
 ### Holding
@@ -244,21 +259,32 @@ class RiskMetrics(Model):
 ## Component Responsibilities
 
 ### Routes Layer
-- **auth.py**: OAuth callback handling, token exchange, credential storage
-- **dashboard.py**: Main dashboard view, net worth display
+- **dashboard.py**: Main dashboard view, broker cards display, aggregate net worth
+- **upload.py**: CSV file upload handling, validation, parser routing
 - **portfolio.py**: Detailed holdings view, position tables
 - **settings.py**: User preferences, broker management, data cleanup
 - **api.py**: AJAX endpoints for refresh, chart data, risk calculations
 
 ### Services Layer
 
-#### Broker Services
-- **broker_base.py**: Abstract base class defining broker interface
-- **[broker]_broker.py**: Concrete implementations for each broker
-  - OAuth flow initiation
-  - Token refresh logic
-  - Position fetching
-  - Account aggregation
+#### CSV Parser Services
+- **csv_parser_base.py**: Abstract base class defining CSV parser interface
+  - validate_csv(file) - Check format, headers
+  - parse_csv(file) - Extract positions
+  - extract_account_number(data) - Get account identifier
+  
+- **merrill_csv_parser.py**: Parses Merrill Lynch CSV format
+- **fidelity_csv_parser.py**: Parses Fidelity CSV format
+- **webull_csv_parser.py**: Parses Webull CSV format
+- **robinhood_csv_parser.py**: Parses Robinhood CSV format
+- **schwab_csv_parser.py**: Parses Schwab CSV format
+
+Each parser handles:
+- Column name variations
+- Number formatting (commas, currency symbols)
+- Date parsing
+- Account number extraction
+- Symbol normalization
 
 #### Analysis Services
 - **holdings_parser.py**: 
@@ -280,42 +306,47 @@ class RiskMetrics(Model):
   - Generates risk flags and alerts
 
 ### Utils Layer
-- **validators.py**: Input validation, data sanitization
-- **helpers.py**: Date formatting, number formatting, common utilities
-- **encryption.py**: Fernet-based credential encryption/decryption
+- **validators.py**: Input validation, data sanitization, CSV format validation
+- **helpers.py**: Date formatting, number formatting, common utilities, file size checks
 
 ## Data Flow
 
 ### Initial Setup Flow
 ```
-1. User lands on /setup/welcome
-2. Selects broker to connect
-3. Redirects to broker OAuth page
-4. Broker redirects back to /oauth/callback/{broker}
-5. Exchange code for tokens
-6. Encrypt and store tokens in DB
-7. Trigger initial position fetch
-8. Create first PortfolioSnapshot
-9. Parse ETF/MF holdings
-10. Calculate risk metrics
-11. Redirect to dashboard
+1. User lands on /dashboard
+2. Sees 5 broker cards in "No data yet" state
+3. Downloads CSV from broker website (external to app)
+4. Drags CSV file onto Merrill Lynch broker card OR clicks Browse
+5. POST to /upload with file and broker_name='merrill'
+6. Server validates file (size, extension, format)
+7. Parse CSV using MerrillCSVParser
+8. Create or update BrokerAccount for Merrill
+9. Create new PortfolioSnapshot for this broker
+10. Parse ETF/MF holdings (mstarpy)
+11. Store holdings in database
+12. If multiple brokers have data, create/update AggregateSnapshot
+13. Calculate risk metrics for aggregate portfolio
+14. Return success + updated broker card data (net worth, position count)
+15. Frontend updates card to "Has Data" state
+16. User repeats for other brokers as desired
 ```
 
-### Manual Refresh Flow
+### Manual Refresh Flow (Per Broker)
 ```
-1. User clicks "Refresh Portfolio" button
-2. AJAX POST to /api/refresh
-3. For each active broker:
-   a. Refresh OAuth token if needed
-   b. Fetch current positions
-4. Create new PortfolioSnapshot
-5. For each holding:
+1. User downloads new CSV from Merrill website
+2. Drags onto Merrill card
+3. POST to /upload with file and broker_name='merrill'
+4. Server validates file
+5. Parse CSV using MerrillCSVParser
+6. Create new PortfolioSnapshot for Merrill (broker_account_id)
+7. For each holding:
    a. If ETF/MF, fetch underlying holdings
    b. Store in holdings table
-6. Aggregate all underlying positions
-7. Calculate risk metrics
-8. Return updated data as JSON
-9. Frontend updates charts and tables
+8. Delete old snapshots beyond retention limit (per broker)
+9. Recalculate AggregateSnapshot (combines latest from all brokers)
+10. Recalculate risk metrics for aggregate portfolio
+11. Return updated data as JSON
+12. Frontend updates Merrill card + aggregate displays
 ```
 
 ### Historical Trend Flow
@@ -354,10 +385,12 @@ OR
 
 ## Security Architecture
 
-### Encryption Strategy
-- **Fernet Symmetric Encryption**: For OAuth tokens at rest
-- **Key Management**: 32-byte key stored in environment variable
-- **Key Rotation**: Manual process (decrypt all, re-encrypt with new key)
+### File Upload Security
+- **File Size Limits**: Max 10MB per CSV file
+- **File Type Validation**: Only .csv extension allowed
+- **Content Validation**: Verify CSV structure before parsing
+- **Filename Sanitization**: Remove special characters, prevent path traversal
+- **Virus Scanning**: (Optional) Integrate ClamAV for production
 
 ### Session Management
 - Flask session cookie (httponly, secure, samesite=strict)
@@ -366,7 +399,7 @@ OR
 
 ### API Security
 - CSRF protection on all POST/PUT/DELETE endpoints
-- Rate limiting on OAuth callbacks (prevent brute force)
+- Rate limiting on upload endpoints (prevent abuse)
 - Input validation on all user inputs
 - SQL injection prevention via SQLAlchemy ORM
 
@@ -398,15 +431,17 @@ OR
 
 ## Error Handling
 
-### OAuth Errors
-- Token expiration: Auto-refresh if refresh token valid
-- Invalid credentials: Prompt user to re-authenticate
-- Broker API down: Graceful degradation, show last snapshot
+### CSV Upload Errors
+- Invalid file format: Show user-friendly error with example format
+- Parsing failures: Log error, skip invalid rows, notify user
+- Missing required columns: Clear error message listing required columns
+- File too large: 413 error with size limit message
+- Unsupported broker: 400 error with list of supported brokers
 
 ### Data Processing Errors
 - Missing ETF/MF data: Flag as "Unable to analyze" in UI
 - Parse failures: Log error, skip holding, notify user
-- Network timeouts: Retry with exponential backoff (3 attempts)
+- Network timeouts (mstarpy): Retry with exponential backoff (3 attempts)
 
 ### Database Errors
 - Connection failures: Retry logic with circuit breaker
@@ -432,7 +467,6 @@ OR
 - Script: `cp /data/portfolio.db /backups/portfolio_$(date +%Y%m%d).db`
 
 ### Credential Recovery
-- Encryption key stored in `.env`
-- **Critical**: Backup `.env` file securely
-- Without key, cannot decrypt stored tokens
-- Consider password manager for key storage
+- No encrypted credentials stored (CSV-only approach)
+- Users download CSVs directly from broker websites
+- No need for encryption key management

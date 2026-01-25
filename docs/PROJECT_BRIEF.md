@@ -5,22 +5,23 @@ A local web-based portfolio analysis tool that aggregates positions across multi
 
 ## Core Functionality
 
-### 1. Multi-Broker Integration
-- **Supported Brokers**: Schwab, Robinhood, Merrill Lynch, Fidelity
-- **Authentication**: OAuth 2.0 with full callback URL setup
-- **Credential Storage**: Encrypted in SQLite database
-- **First-Run Setup**: Guided broker connection wizard
+### 1. Multi-Broker CSV Import
+- **Supported Brokers**: Merrill Lynch, Fidelity, Webull, Robinhood, Schwab
+- **Import Method**: Drag-and-drop or browse CSV files exported from broker websites
+- **CSV Parsers**: Broker-specific parsers handle different CSV formats
+- **First-Run Setup**: User uploads CSV from each broker they have accounts with
 
 ### 2. Portfolio Data Management
-- **Manual Refresh**: User-triggered data pulls via button
-- **Historical Snapshots**: Retained for last N pulls (user-configurable, default 25)
-- **Initial Load**: Downloads all positions on first connection
-- **Data Persistence**: All snapshots stored with timestamp
+- **Manual Upload**: User uploads new CSV files to refresh portfolio data
+- **Historical Snapshots**: Retained for last N uploads (user-configurable, default 25)
+- **Initial Load**: Parses CSV and creates first snapshot per broker
+- **Data Persistence**: All snapshots stored with timestamp and source filename
 
 ### 3. Holdings Analysis
 - **ETF/Mutual Fund Parsing**: Top 50 holdings via mstarpy (fallback to custom script for top 25)
-- **Position Aggregation**: Combines holdings across all brokers
+- **Position Aggregation**: Combines holdings across all broker CSV uploads
 - **Underlying Stock Resolution**: Breaks down ETFs/MFs to individual stocks
+- **CSV Format Handling**: Flexible parsers for each broker's export format
 
 ### 4. Risk Analysis & Alerts
 
@@ -52,8 +53,10 @@ A local web-based portfolio analysis tool that aggregates positions across multi
 - **Time Range**: Selectable based on available snapshots
 
 ### 6. Data Management
+- **Upload CSV**: Drag-and-drop or browse interface per broker card
 - **Clear History**: Button to wipe all historical snapshots
 - **Clear All Data**: Nuclear option to reset database (with double confirmation)
+- **Re-upload**: Update any broker's data by uploading a new CSV
 - **Export**: (Future consideration) CSV/JSON export capability
 
 ## Technical Stack
@@ -85,7 +88,7 @@ A local web-based portfolio analysis tool that aggregates positions across multi
 
 ### Application Layer
 - Single-user mode (no multi-user authentication needed)
-- Encrypted credential storage (Fernet with env-based key)
+- Secure file upload handling (validate CSV format, size limits)
 - CSRF protection on all forms
 - Input validation and sanitization
 - Secure session management
@@ -100,25 +103,34 @@ A local web-based portfolio analysis tool that aggregates positions across multi
 ### Data Layer
 - Database file permissions locked down
 - No sensitive data in logs
-- Encryption key stored in environment (not in code)
+- CSV file validation before processing
+- Sanitize uploaded filenames
 - Volume mounts for data persistence
 
 ## User Flows
 
 ### First-Time Setup
 1. User accesses https://localhost
-2. Welcome screen with setup wizard
-3. Configure broker connections (one by one)
-4. OAuth flow for each broker (callback handling)
-5. Initial data pull and snapshot creation
-6. Redirect to dashboard
+2. Welcome screen with dashboard
+3. Sees 5 broker cards (Merrill Lynch, Fidelity, Webull, Robinhood, Schwab) in "No data yet" state
+4. User downloads CSV from broker website (outside app)
+5. Drags CSV onto appropriate broker card OR clicks Browse button
+6. App validates and parses CSV
+7. Creates initial snapshot for that broker
+8. Card updates to show net worth and position count
+9. Repeat for other brokers as desired
+10. Risk analysis automatically updates with combined data
 
 ### Regular Usage
-1. User accesses dashboard (shows last snapshot)
+1. User accesses dashboard (shows last snapshot data for each broker)
 2. Views current portfolio breakdown and net worth
 3. Checks risk alerts and concentrations
-4. Optionally triggers manual refresh (new snapshot)
-5. Views historical trends of risk metrics
+4. When ready to refresh a broker's data:
+   a. Download new CSV from broker website
+   b. Upload to corresponding broker card
+   c. App creates new snapshot for that broker only
+   d. Risk analysis updates
+5. Views historical trends across all brokers
 6. Adjusts settings (snapshot retention, theme, etc.)
 
 ### Data Management
@@ -126,9 +138,11 @@ A local web-based portfolio analysis tool that aggregates positions across multi
 2. Can clear historical snapshots (confirmation required)
 3. Can reset entire database (double confirmation)
 4. Can adjust snapshot retention limit
+5. Can remove/re-add broker cards
 
 ## Out of Scope (Future Enhancements)
 - Multi-user support
+- OAuth integration with broker APIs
 - Automatic scheduled refreshes
 - Public cloud deployment
 - Mobile app/responsive design
@@ -139,8 +153,8 @@ A local web-based portfolio analysis tool that aggregates positions across multi
 - What-if scenario modeling
 
 ## Success Criteria
-- Successfully connects to all 4 brokers via OAuth
-- Accurately aggregates positions across brokers
+- Successfully parses CSV files from all 5 supported brokers
+- Accurately aggregates positions across broker accounts
 - Correctly identifies stock concentrations >20%
 - Detects ETF/MF overlaps >70%
 - Shows sector and geographic concentrations
@@ -149,10 +163,13 @@ A local web-based portfolio analysis tool that aggregates positions across multi
 - No security vulnerabilities in OWASP Top 10 categories
 - Clean, intuitive UI with light/dark theme toggle
 - Sub-second page loads for typical portfolio sizes (<1000 positions)
+- Drag-and-drop CSV upload works smoothly
+- Clear error messages for invalid CSV formats
 
 ## Constraints
 - Localhost deployment only
 - Desktop browsers only (Chrome, Firefox, Safari latest versions)
-- Manual data refresh only (no real-time streaming)
-- Dependent on broker API availability and rate limits
+- Manual CSV upload only (no automatic data refresh)
+- Dependent on user downloading CSVs from broker websites
 - ETF/MF holdings limited to top 25-50 (data source dependent)
+- CSV format variations may require parser updates

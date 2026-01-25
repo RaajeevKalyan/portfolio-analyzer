@@ -49,6 +49,7 @@ Thumbs.db
 *.wmv
 
 ## Portfolio analyzer additions here
+# Environment and secrets
 .env
 .env.local
 
@@ -60,6 +61,16 @@ backups/
 # SSL certificates
 nginx/ssl/*.pem
 
+# User uploads
+app/uploads/
+
+# Distribution artifacts
+*.tar
+*.tar.gz
+*-distribution/
+portfolio-app-*.tar*
+portfolio-nginx-*.tar*
+
 # Python
 __pycache__/
 *.py[cod]
@@ -68,11 +79,18 @@ __pycache__/
 .Python
 venv/
 env/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
 
 # OS
 .DS_Store
@@ -81,3 +99,17 @@ Thumbs.db
 # Database
 *.db
 *.db-journal
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Alembic
+alembic/versions/*.pyc
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+.~*

@@ -6,25 +6,25 @@
 ---
 
 ## Project Summary
-A local, Docker-based Flask web app that aggregates portfolio data from multiple brokers (Schwab, Robinhood, Merrill Lynch, Fidelity), analyzes risk concentrations, identifies ETF/mutual fund overlaps, and tracks portfolio composition over time.
+A local, Docker-based Flask web app that aggregates portfolio data from CSV exports from multiple brokers (Merrill Lynch, Fidelity, Webull, Robinhood, Schwab), analyzes risk concentrations, identifies ETF/mutual fund overlaps, and tracks portfolio composition over time.
 
 ## Tech Stack
-- **Backend**: Flask + Gunicorn + SQLAlchemy + SQLite (file-based, NOT a container)
+- **Backend**: Flask + Gunicorn + SQLAlchemy + SQLite (file-based, NOT a container) + Pandas (CSV parsing)
 - **Frontend**: Bootstrap 5 + Chart.js + Vanilla JS
 - **Infrastructure**: Docker (2 containers: nginx + Flask app)
-- **Data Sources**: Broker APIs (OAuth 2.0) + mstarpy (ETF/MF holdings)
-- **Security**: Fernet encryption, OWASP hardening, TLS 1.2+
+- **Data Sources**: CSV files from brokers + mstarpy (ETF/MF holdings)
+- **Security**: File upload validation, OWASP hardening, TLS 1.2+
 
 ### Container Architecture (2 Containers)
 1. **nginx container** - Reverse proxy, HTTPS termination, security headers
-2. **Flask app container** - Application logic, Gunicorn WSGI server
+2. **Flask app container** - Application logic, Gunicorn WSGI server, CSV processing
 3. **NOT a container** - SQLite database (just a file: `./data/portfolio.db`)
 
 SQLite runs in-process within the Flask app. No separate database container needed.
 
 ## Core Features
-1. Multi-broker OAuth integration (manual refresh only)
-2. Portfolio aggregation and position consolidation
+1. Multi-broker CSV import (drag-and-drop or browse)
+2. Portfolio aggregation and position consolidation across brokers
 3. ETF/MF underlying holdings analysis (top 50 via mstarpy, fallback to top 25)
 4. Risk analysis:
    - Stock concentration (>20% = red flag)
@@ -34,25 +34,27 @@ SQLite runs in-process within the Flask app. No separate database container need
 5. Historical trend tracking (user-configurable snapshot retention, default 25)
 6. Data management (clear history, reset all data)
 7. Light/dark theme toggle
+8. Broker-specific CSV parsers for format variations
 
 ## Architecture Decisions
 
 ### Database Schema
 - **UserSettings**: Theme preference, snapshot retention limit
-- **BrokerCredential**: Encrypted OAuth tokens per broker
-- **PortfolioSnapshot**: Point-in-time portfolio state
+- **BrokerAccount**: Broker name, account identifier, last upload timestamp
+- **PortfolioSnapshot**: Point-in-time portfolio state per broker
+- **AggregateSnapshot**: Combined snapshot across all brokers
 - **Holding**: Individual positions (stocks, ETFs, MFs)
 - **UnderlyingHolding**: Resolved ETF/MF constituents
-- **RiskMetrics**: Calculated risk indicators per snapshot
+- **RiskMetrics**: Calculated risk indicators for aggregate portfolio
 
 ### Key Workflows
-1. **First-time setup**: Wizard → Connect brokers → OAuth flow → Initial data pull → Dashboard
-2. **Manual refresh**: Button → Fetch positions → Parse ETFs/MFs → Calculate risk → Update UI
-3. **Historical view**: Fetch last N snapshots → Build time-series → Render charts
+1. **First-time setup**: Dashboard → Upload CSV to broker card → Parse & store → Show net worth
+2. **Manual refresh**: Download new CSV from broker → Upload to card → Create new snapshot → Recalculate risk
+3. **Historical view**: Fetch last N aggregate snapshots → Build time-series → Render charts
 4. **Data cleanup**: Confirm → Delete old snapshots OR reset entire database
 
 ### Security Approach
-- **Credentials**: Fernet encryption at rest, key in environment variable
+- **File Uploads**: Size limits (10MB), extension validation (.csv only), content verification
 - **Network**: HTTPS only (port 80 redirects), TLS 1.2+, strong ciphers
 - **Application**: CSRF protection, input validation, SQL injection prevention via ORM
 - **Infrastructure**: nginx with OWASP Top 10 hardening, security headers, rate limiting
@@ -76,15 +78,19 @@ portfolio-analyzer/
 │   ├── database.py             # DB connection
 │   ├── encryption.py           # Fernet wrapper
 │   ├── routes/                 # Flask routes
-│   │   ├── auth.py             # OAuth flows
-│   │   ├── dashboard.py        # Main view
+│   │   ├── dashboard.py        # Main view, broker cards
+│   │   ├── upload.py           # CSV upload handling
 │   │   ├── portfolio.py        # Holdings table
 │   │   ├── settings.py         # User preferences
 │   │   └── api.py              # AJAX endpoints
 │   ├── services/               # Business logic
-│   │   ├── broker_base.py      # Abstract broker interface
-│   │   ├── [broker]_broker.py  # Concrete implementations
-│   │   ├── holdings_parser.py  # mstarpy + fallback
+│   │   ├── csv_parser_base.py    # Abstract CSV parser
+│   │   ├── merrill_csv_parser.py  # Merrill format
+│   │   ├── fidelity_csv_parser.py # Fidelity format
+│   │   ├── webull_csv_parser.py   # Webull format
+│   │   ├── robinhood_csv_parser.py # Robinhood format
+│   │   ├── schwab_csv_parser.py   # Schwab format
+│   │   ├── holdings_parser.py     # mstarpy + fallback
 │   │   ├── portfolio_aggregator.py
 │   │   └── risk_analyzer.py
 │   ├── utils/                  # Helpers
@@ -101,8 +107,19 @@ portfolio-analyzer/
 ┌─────────────────────────────────────────────────────┐
 │ Navbar: Logo | Dashboard | Portfolio | History | Settings | [Theme] │
 ├─────────────────────────────────────────────────────┤
-│ [Net Worth Card] [Last Updated] [Risk Level]       │
-│ [Donut Chart: Asset Allocation]                    │
+│ Total Net Worth: $1,234,567 | Last Updated: Jan 25 │
+│                                                     │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+│ │ Merrill  │ │ Fidelity │ │  Webull  │  Broker   │
+│ │ $267,000 │ │ $456,789 │ │ $100,278 │  Cards    │
+│ │[Upload]  │ │[Upload]  │ │[Upload]  │            │
+│ └──────────┘ └──────────┘ └──────────┘            │
+│ ┌──────────┐ ┌──────────┐                         │
+│ │Robinhood │ │  Schwab  │                         │
+│ │ $89,500  │ │ $321,000 │                         │
+│ │[Upload]  │ │[Upload]  │                         │
+│ └──────────┘ └──────────┘                         │
+│                                                     │
 │ [Risk Alerts] | [Top Holdings Table]               │
 └─────────────────────────────────────────────────────┘
 ```
@@ -119,31 +136,39 @@ portfolio-analyzer/
 
 ### DO NOT CHANGE:
 1. **Single-user mode**: No multi-user auth system
-2. **Manual refresh only**: No automatic data pulls
-3. **Desktop-only UI**: No mobile responsive requirements
-4. **Localhost deployment**: No public cloud features
-5. **SQLite database**: No migration to other databases
-6. **OAuth flow**: Full callback URL setup (not manual token entry)
+2. **Manual refresh only**: No automatic data pulls  
+3. **CSV-only approach**: No OAuth integration (can add later)
+4. **Desktop-only UI**: No mobile responsive requirements
+5. **Localhost deployment**: No public cloud features
+6. **SQLite database**: No migration to other databases
 7. **HTTPS only**: Port 80 must redirect to 443
-8. **Fernet encryption**: Do not switch to other encryption methods
+8. **Supported brokers**: Merrill Lynch, Fidelity, Webull, Robinhood, Schwab
 
 ### MUST FOLLOW:
 1. **OWASP Top 10**: All mitigations documented in SECURITY_SPEC.md
 2. **nginx hardening**: Security headers, TLS 1.2+, strong ciphers
-3. **Input validation**: All user inputs validated/sanitized
+3. **Input validation**: All user inputs validated/sanitized (especially CSV files)
 4. **CSRF protection**: All state-changing operations protected
-5. **Encrypted storage**: OAuth tokens encrypted at rest
+5. **File upload security**: Size limits, extension validation, content verification
 6. **No browser storage**: localStorage/sessionStorage not used (artifacts limitation)
 
 ## Common Modification Patterns
 
 ### Adding a New Broker
-1. Create `app/services/[broker]_broker.py` extending `broker_base.py`
-2. Implement OAuth methods: `get_auth_url()`, `exchange_code()`, `refresh_token()`, `fetch_positions()`
+1. Create `app/services/[broker]_csv_parser.py` extending `csv_parser_base.py`
+2. Implement parser methods: `validate_csv()`, `parse_csv()`, `extract_account_number()`
 3. Add broker to allowed list in validators
-4. Add OAuth callback route: `/oauth/callback/[broker]`
-5. Update UI: Add broker card in setup wizard
-6. Add credentials to `.env.example`
+4. Add broker card to dashboard template
+5. Update broker color scheme in CSS
+6. Test with real CSV from that broker
+
+### Adding CSV Format Variations
+1. Identify the broker (e.g., Merrill Lynch)
+2. Open `app/services/merrill_csv_parser.py`
+3. Add format detection logic in `parse_csv()`
+4. Handle column name variations (case-insensitive matching)
+5. Add number/date parsing flexibility
+6. Test with multiple CSV samples
 
 ### Adding a New Risk Metric
 1. Add calculation to `app/services/risk_analyzer.py`
@@ -160,8 +185,8 @@ portfolio-analyzer/
 
 ### Adjusting Security Settings
 1. nginx config: `nginx/nginx.conf` (headers, ciphers, timeouts)
-2. Flask config: `app/config.py` (session, CSRF, cookies)
-3. Encryption: `app/encryption.py` (only change if rotating keys)
+2. Flask config: `app/config.py` (session, CSRF, cookies, file upload limits)
+3. File upload: `app/routes/upload.py` (max file size, allowed extensions)
 4. Always test with SSL Labs after changes
 
 ## Prompt Template for Modifications
@@ -212,9 +237,9 @@ Please:
 ## Known Limitations
 
 ### Data Sources
+- CSV export from brokers may have format variations → parsers handle common patterns
 - mstarpy may not return holdings for all ETFs/MFs → fallback to custom scraper
-- Broker APIs have rate limits → implement exponential backoff
-- Historical data limited by snapshot retention setting
+- User must manually download CSVs from broker websites → document export instructions
 
 ### Browser Compatibility
 - Requires modern browser (Chrome, Firefox, Safari latest)
@@ -222,9 +247,10 @@ Please:
 - No Internet Explorer support
 
 ### Performance
-- Large portfolios (>1000 positions) may take 30-60s to refresh
+- Large CSV files (>1000 positions) may take 10-20s to parse
 - Chart rendering may be slow with >100 historical snapshots
 - SQLite has concurrent write limitations (single user mitigates this)
+- File upload progress indicators prevent UI freezing
 
 ## Version Information
 - Python: 3.11
@@ -286,8 +312,8 @@ Reference: DOCKER_SETUP.md for container configuration
 
 ## 📌 Remember
 - This is a **single-user**, **localhost-only** tool
-- Security is critical: OAuth tokens, portfolio data must be protected
-- Manual refresh only: No automatic data pulls
+- Security is critical: File uploads must be validated, data must be protected
+- Manual CSV upload only: No automatic data pulls or OAuth (for now)
 - Desktop browsers only: No mobile responsive design needed
 - Always test SSL configuration after nginx changes
-- Keep .env file backed up securely (contains encryption key)
+- Keep broker CSV formats documented (they may change)
