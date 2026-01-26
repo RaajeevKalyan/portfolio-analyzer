@@ -205,7 +205,6 @@
             height: 1rem;
         }
         
-        /* IMPROVED NOTIFICATION STYLES */
         .toast-container {
             position: fixed;
             top: 20px;
@@ -226,46 +225,23 @@
         }
         
         @keyframes slideIn {
-            from {
-                transform: translateX(450px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+            from { transform: translateX(450px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
         
         @keyframes slideOut {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(450px);
-                opacity: 0;
-            }
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(450px); opacity: 0; }
         }
         
         .custom-toast.hiding {
             animation: slideOut 0.3s ease-in forwards;
         }
         
-        .custom-toast.toast-success {
-            border-left-color: #10b981;
-        }
-        
-        .custom-toast.toast-error {
-            border-left-color: #ef4444;
-        }
-        
-        .custom-toast.toast-warning {
-            border-left-color: #f59e0b;
-        }
-        
-        .custom-toast.toast-info {
-            border-left-color: #3b82f6;
-        }
+        .custom-toast.toast-success { border-left-color: #10b981; }
+        .custom-toast.toast-error { border-left-color: #ef4444; }
+        .custom-toast.toast-warning { border-left-color: #f59e0b; }
+        .custom-toast.toast-info { border-left-color: #3b82f6; }
         
         .toast-header-custom {
             display: flex;
@@ -285,25 +261,10 @@
             flex-shrink: 0;
         }
         
-        .toast-success .toast-icon {
-            background-color: #d1fae5;
-            color: #10b981;
-        }
-        
-        .toast-error .toast-icon {
-            background-color: #fee2e2;
-            color: #ef4444;
-        }
-        
-        .toast-warning .toast-icon {
-            background-color: #fef3c7;
-            color: #f59e0b;
-        }
-        
-        .toast-info .toast-icon {
-            background-color: #dbeafe;
-            color: #3b82f6;
-        }
+        .toast-success .toast-icon { background-color: #d1fae5; color: #10b981; }
+        .toast-error .toast-icon { background-color: #fee2e2; color: #ef4444; }
+        .toast-warning .toast-icon { background-color: #fef3c7; color: #f59e0b; }
+        .toast-info .toast-icon { background-color: #dbeafe; color: #3b82f6; }
         
         .toast-content {
             flex: 1;
@@ -323,7 +284,6 @@
             margin: 0;
             line-height: 1.5;
             word-wrap: break-word;
-            overflow-wrap: break-word;
         }
         
         .toast-close {
@@ -357,25 +317,13 @@
         
         .toast-progress-bar {
             height: 100%;
-            background-color: currentColor;
             transition: width 0.1s linear;
         }
         
-        .toast-success .toast-progress-bar {
-            background-color: #10b981;
-        }
-        
-        .toast-error .toast-progress-bar {
-            background-color: #ef4444;
-        }
-        
-        .toast-warning .toast-progress-bar {
-            background-color: #f59e0b;
-        }
-        
-        .toast-info .toast-progress-bar {
-            background-color: #3b82f6;
-        }
+        .toast-success .toast-progress-bar { background-color: #10b981; }
+        .toast-error .toast-progress-bar { background-color: #ef4444; }
+        .toast-warning .toast-progress-bar { background-color: #f59e0b; }
+        .toast-info .toast-progress-bar { background-color: #3b82f6; }
     </style>
 </head>
 <body>
@@ -407,7 +355,7 @@
                 <div class="col-md-6">
                     <div class="net-worth-card">
                         <div class="net-worth-label">Total Net Worth</div>
-                        <div class="net-worth-value" id="totalNetWorth">$0.00</div>
+                        <div class="net-worth-value">${{ "{:,.2f}".format(total_net_worth) }}</div>
                     </div>
                 </div>
             </div>
@@ -417,115 +365,71 @@
     <!-- Main Content -->
     <div class="container pb-5">
         <div class="broker-grid">
-            <!-- Merrill Lynch -->
-            <div class="broker-card no-data" data-broker="merrill" id="broker-merrill">
+            {% for broker in brokers %}
+            <div class="broker-card {% if not broker.has_data %}no-data{% endif %}" 
+                 data-broker="{{ broker.name }}"
+                 id="broker-{{ broker.name }}">
+                
                 <div class="text-center">
-                    <i class="fas fa-building-columns broker-icon"></i>
-                    <div class="broker-name">Merrill Lynch</div>
+                    <i class="fas 
+                        {% if broker.name == 'merrill' %}fa-building-columns
+                        {% elif broker.name == 'fidelity' %}fa-chart-line
+                        {% elif broker.name == 'webull' %}fa-chart-simple
+                        {% elif broker.name == 'robinhood' %}fa-arrow-trend-up
+                        {% elif broker.name == 'schwab' %}fa-landmark
+                        {% endif %} 
+                        broker-icon">
+                    </i>
+                    <div class="broker-name">{{ broker.display_name }}</div>
                 </div>
-                <div class="upload-zone" 
-                     id="upload-zone-merrill"
-                     onclick="triggerUpload('merrill')"
-                     ondrop="handleDrop(event, 'merrill')"
-                     ondragover="handleDragOver(event)"
-                     ondragleave="handleDragLeave(event)">
-                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                    <p class="mb-2"><strong>Drop CSV here</strong></p>
-                    <p class="text-muted small mb-3">or click to browse</p>
-                    <button class="btn btn-upload btn-sm">
-                        <i class="fas fa-file-upload"></i> Upload CSV
-                    </button>
-                </div>
-                <input type="file" id="file-input-merrill" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'merrill')">
-            </div>
 
-            <!-- Fidelity -->
-            <div class="broker-card no-data" data-broker="fidelity" id="broker-fidelity">
-                <div class="text-center">
-                    <i class="fas fa-chart-line broker-icon"></i>
-                    <div class="broker-name">Fidelity</div>
-                </div>
-                <div class="upload-zone" 
-                     id="upload-zone-fidelity"
-                     onclick="triggerUpload('fidelity')"
-                     ondrop="handleDrop(event, 'fidelity')"
-                     ondragover="handleDragOver(event)"
-                     ondragleave="handleDragLeave(event)">
-                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                    <p class="mb-2"><strong>Drop CSV here</strong></p>
-                    <p class="text-muted small mb-3">or click to browse</p>
-                    <button class="btn btn-upload btn-sm">
-                        <i class="fas fa-file-upload"></i> Upload CSV
-                    </button>
-                </div>
-                <input type="file" id="file-input-fidelity" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'fidelity')">
+                {% if broker.has_data %}
+                    <!-- Has Data -->
+                    <div class="broker-value">${{ "{:,.2f}".format(broker.total_value) }}</div>
+                    <div class="broker-positions">
+                        <i class="fas fa-layer-group"></i>
+                        {{ broker.total_positions }} position{% if broker.total_positions != 1 %}s{% endif %}
+                    </div>
+                    {% if broker.account_last4 %}
+                    <div class="text-muted small">
+                        Account: ***{{ broker.account_last4 }}
+                    </div>
+                    {% endif %}
+                    <div class="broker-last-updated">
+                        <i class="far fa-clock"></i>
+                        Last updated: {{ broker.last_updated }}
+                    </div>
+                    <div class="mt-3">
+                        <button class="btn btn-sm btn-outline-primary w-100" 
+                                onclick="triggerUpload('{{ broker.name }}')">
+                            <i class="fas fa-sync-alt"></i> Update CSV
+                        </button>
+                    </div>
+                {% else %}
+                    <!-- No Data Yet -->
+                    <div class="upload-zone" 
+                         id="upload-zone-{{ broker.name }}"
+                         onclick="triggerUpload('{{ broker.name }}')"
+                         ondrop="handleDrop(event, '{{ broker.name }}')"
+                         ondragover="handleDragOver(event)"
+                         ondragleave="handleDragLeave(event)">
+                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                        <p class="mb-2"><strong>Drop CSV here</strong></p>
+                        <p class="text-muted small mb-3">or click to browse</p>
+                        <button class="btn btn-upload btn-sm">
+                            <i class="fas fa-file-upload"></i> Upload CSV
+                        </button>
+                    </div>
+                {% endif %}
+                
+                <!-- Hidden file input -->
+                <input type="file" 
+                       id="file-input-{{ broker.name }}" 
+                       accept=".csv"
+                       style="display: none;"
+                       onchange="handleFileSelect(event, '{{ broker.name }}')">
             </div>
-
-            <!-- Webull -->
-            <div class="broker-card no-data" data-broker="webull" id="broker-webull">
-                <div class="text-center">
-                    <i class="fas fa-chart-simple broker-icon"></i>
-                    <div class="broker-name">Webull</div>
-                </div>
-                <div class="upload-zone" 
-                     id="upload-zone-webull"
-                     onclick="triggerUpload('webull')"
-                     ondrop="handleDrop(event, 'webull')"
-                     ondragover="handleDragOver(event)"
-                     ondragleave="handleDragLeave(event)">
-                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                    <p class="mb-2"><strong>Drop CSV here</strong></p>
-                    <p class="text-muted small mb-3">or click to browse</p>
-                    <button class="btn btn-upload btn-sm">
-                        <i class="fas fa-file-upload"></i> Upload CSV
-                    </button>
-                </div>
-                <input type="file" id="file-input-webull" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'webull')">
-            </div>
-
-            <!-- Robinhood -->
-            <div class="broker-card no-data" data-broker="robinhood" id="broker-robinhood">
-                <div class="text-center">
-                    <i class="fas fa-arrow-trend-up broker-icon"></i>
-                    <div class="broker-name">Robinhood</div>
-                </div>
-                <div class="upload-zone" 
-                     id="upload-zone-robinhood"
-                     onclick="triggerUpload('robinhood')"
-                     ondrop="handleDrop(event, 'robinhood')"
-                     ondragover="handleDragOver(event)"
-                     ondragleave="handleDragLeave(event)">
-                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                    <p class="mb-2"><strong>Drop CSV here</strong></p>
-                    <p class="text-muted small mb-3">or click to browse</p>
-                    <button class="btn btn-upload btn-sm">
-                        <i class="fas fa-file-upload"></i> Upload CSV
-                    </button>
-                </div>
-                <input type="file" id="file-input-robinhood" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'robinhood')">
-            </div>
-
-            <!-- Schwab -->
-            <div class="broker-card no-data" data-broker="schwab" id="broker-schwab">
-                <div class="text-center">
-                    <i class="fas fa-landmark broker-icon"></i>
-                    <div class="broker-name">Charles Schwab</div>
-                </div>
-                <div class="upload-zone" 
-                     id="upload-zone-schwab"
-                     onclick="triggerUpload('schwab')"
-                     ondrop="handleDrop(event, 'schwab')"
-                     ondragover="handleDragOver(event)"
-                     ondragleave="handleDragLeave(event)">
-                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                    <p class="mb-2"><strong>Drop CSV here</strong></p>
-                    <p class="text-muted small mb-3">or click to browse</p>
-                    <button class="btn btn-upload btn-sm">
-                        <i class="fas fa-file-upload"></i> Upload CSV
-                    </button>
-                </div>
-                <input type="file" id="file-input-schwab" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'schwab')">
-            </div>
+            {% endfor %}
         </div>
     </div>
 
@@ -535,7 +439,6 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Custom JS -->
     <script>
         function triggerUpload(brokerName) {
             document.getElementById(`file-input-${brokerName}`).click();
@@ -682,10 +585,6 @@
                 }, 300);
             }
         }
-
-        setTimeout(() => {
-            showToast('Welcome!', 'Upload a CSV file from any broker to get started', 'info', 4000);
-        }, 500);
     </script>
 </body>
 </html>
