@@ -1,17 +1,19 @@
 """
-CSV Upload Routes
+CSV Upload Routes - Updated with Holdings Resolution
 
-Handles file uploads from broker CSV exports.
+Handles file uploads from broker CSV exports and resolves ETF/MF holdings.
 """
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 from app.database import db_session
 from app.models import BrokerAccount, PortfolioSnapshot, Holding
 from app.services.merrill_csv_parser import MerrillCSVParser
+from app.services.holdings_resolver import resolve_snapshot_holdings
 from datetime import datetime
 from decimal import Decimal
 import os
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +176,14 @@ def upload_csv():
             logger.error(f"Error storing data: {e}", exc_info=True)
             raise
         
+        # Resolve ETF/MF holdings in background thread
+        print("Starting background holdings resolution...")
+        threading.Thread(
+            target=resolve_holdings_background,
+            args=(snapshot_id,),
+            daemon=True
+        ).start()
+        
         # Clean up uploaded file (optional - keep for debugging)
         # os.remove(file_path)
         
@@ -203,6 +213,22 @@ def upload_csv():
             'success': False,
             'message': f'Server error: {str(e)}'
         }), 500
+
+
+def resolve_holdings_background(snapshot_id: int):
+    """
+    Background task to resolve ETF/MF holdings
+    
+    Runs in a separate thread to avoid blocking the upload response
+    """
+    try:
+        logger.info(f"Background task started: resolving holdings for snapshot {snapshot_id}")
+        resolved_count = resolve_snapshot_holdings(snapshot_id)
+        logger.info(f"Background task complete: resolved {resolved_count} holdings for snapshot {snapshot_id}")
+    except Exception as e:
+        logger.error(f"Error in background holdings resolution for snapshot {snapshot_id}: {e}")
+        logger.exception(e)
+
 
 def store_portfolio_data(broker_name: str, parsed_data: dict, csv_filename: str) -> int:
     """
@@ -266,7 +292,7 @@ def store_portfolio_data(broker_name: str, parsed_data: dict, csv_filename: str)
                 total_value=holding_data['total_value'],
                 asset_type=holding_data['asset_type'],
                 account_type=holding_data.get('account_type'),
-                underlying_parsed=False  # Will be parsed later by ETF/MF parser
+                underlying_parsed=False  # Will be parsed by background task
             )
             session.add(holding)
         

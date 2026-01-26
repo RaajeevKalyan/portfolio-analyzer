@@ -62,7 +62,9 @@ def register_routes(app):
     
     # Register blueprints
     from app.routes.upload import upload_bp
+    from app.routes.holdings import holdings_bp
     app.register_blueprint(upload_bp)
+    app.register_blueprint(holdings_bp)
     
     @app.route('/')
     def index():

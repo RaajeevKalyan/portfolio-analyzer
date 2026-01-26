@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Holdings - Portfolio Risk Analyzer</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+        }
+        
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2d3748;
+        }
+        
+        .page-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .holdings-table {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .holdings-row {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .holdings-row:hover {
+            background-color: #f7fafc;
+        }
+        
+        .holdings-row.expandable:hover {
+            background-color: #edf2f7;
+        }
+        
+        .symbol-cell {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #2d3748;
+        }
+        
+        .etf-badge {
+            background-color: #9f7aea;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+        
+        .mf-badge {
+            background-color: #4299e1;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+        
+        .expand-icon {
+            transition: transform 0.3s;
+            color: #718096;
+        }
+        
+        .expanded .expand-icon {
+            transform: rotate(90deg);
+        }
+        
+        .allocation-bar {
+            height: 8px;
+            background-color: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.25rem;
+        }
+        
+        .allocation-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
+        }
+        
+        .broker-breakdown {
+            display: none;
+            padding: 1rem;
+            background-color: #f7fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .broker-breakdown.show {
+            display: block;
+        }
+        
+        .broker-item {
+            padding: 0.5rem 0;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+        
+        .underlying-holdings {
+            display: none;
+            padding: 1rem;
+            background-color: #edf2f7;
+            border-top: 2px solid #cbd5e0;
+        }
+        
+        .underlying-holdings.show {
+            display: block;
+        }
+        
+        .underlying-table {
+            margin-top: 1rem;
+        }
+        
+        .overlap-warning {
+            background-color: #fff5f5;
+            border-left: 4px solid #f56565;
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+            border-radius: 4px;
+        }
+        
+        .overlap-icon {
+            color: #f56565;
+        }
+        
+        .value-cell {
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .allocation-text {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-light">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-pie"></i> Portfolio Risk Analyzer
+            </a>
+            <div>
+                <a href="/" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="container">
+            <h1 class="mb-2">Portfolio Holdings</h1>
+            <p class="mb-0 opacity-75">Aggregated across all brokers</p>
+            <h3 class="mt-3">Total Value: ${{ "{:,.2f}".format(total_value) }}</h3>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container pb-5">
+        {% if error_message %}
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle"></i>
+            Error loading holdings: {{ error_message }}
+        </div>
+        {% endif %}
+
+        {% if holdings %}
+        <div class="holdings-table">
+            {% for holding in holdings %}
+            <div class="holdings-row {% if holding.is_etf_or_mf or holding.brokers|length > 1 %}expandable expanded{% endif %}" 
+                 id="holding-{{ holding.symbol }}"
+                 onclick="toggleHolding('{{ holding.symbol }}')">
+                
+                <div class="row align-items-center">
+                    <!-- Symbol and Name -->
+                    <div class="col-md-4">
+                        <div class="symbol-cell">
+                            {% if holding.is_etf_or_mf or holding.brokers|length > 1 %}
+                            <i class="fas fa-chevron-right expand-icon"></i>
+                            {% endif %}
+                            {{ holding.symbol }}
+                            {% if holding.asset_type == 'etf' %}
+                            <span class="etf-badge">ETF</span>
+                            {% elif holding.asset_type == 'mutual_fund' %}
+                            <span class="mf-badge">MF</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-muted small">{{ holding.name }}</div>
+                        {% if holding.has_overlap %}
+                        <div class="mt-1">
+                            <span class="badge bg-warning text-dark">
+                                <i class="fas fa-exclamation-triangle"></i> Overlap Detected
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Quantity -->
+                    <div class="col-md-2 text-end">
+                        <div class="value-cell">{{ "{:,.4f}".format(holding.total_quantity) }}</div>
+                        <div class="text-muted small">shares</div>
+                    </div>
+                    
+                    <!-- Value -->
+                    <div class="col-md-2 text-end">
+                        <div class="value-cell">${{ "{:,.2f}".format(holding.total_value) }}</div>
+                        <div class="text-muted small">@ ${{ "{:,.2f}".format(holding.average_price) }}</div>
+                    </div>
+                    
+                    <!-- Allocation -->
+                    <div class="col-md-4">
+                        <div class="allocation-text">{{ "{:.2f}".format(holding.allocation_pct * 100) }}%</div>
+                        <div class="allocation-bar">
+                            <div class="allocation-fill" style="width: {{ holding.allocation_pct * 100 }}%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Broker Breakdown -->
+                {% if holding.brokers|length > 1 %}
+                <div class="broker-breakdown show" id="breakdown-{{ holding.symbol }}">
+                    <h6 class="mb-3"><i class="fas fa-building"></i> Held across {{ holding.brokers|length }} brokers:</h6>
+                    {% for broker in holding.brokers %}
+                    <div class="broker-item">
+                        <i class="fas fa-arrow-right text-muted"></i>
+                        <strong>{{ broker.broker_display }}</strong>
+                        {% if broker.account_last4 %}(***{{ broker.account_last4 }}){% endif %}:
+                        {{ "{:,.4f}".format(broker.quantity) }} shares @ ${{ "{:,.2f}".format(broker.price) }}
+                        = <strong>${{ "{:,.2f}".format(broker.value) }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <!-- ETF/MF Underlying Holdings -->
+                {% if holding.is_etf_or_mf and holding.underlying_count > 0 %}
+                <div class="underlying-holdings show" id="underlying-{{ holding.symbol }}">
+                    <h6 class="mb-3">
+                        <i class="fas fa-layer-group"></i> 
+                        Underlying Holdings ({{ holding.underlying_count }} total)
+                        <button class="btn btn-sm btn-outline-secondary ms-2" 
+                                onclick="event.stopPropagation(); loadUnderlyingDetails('{{ holding.symbol }}')">
+                            <i class="fas fa-search"></i> View All
+                        </button>
+                    </h6>
+                    
+                    <div id="underlying-details-{{ holding.symbol }}">
+                        <p class="text-muted small">
+                            <i class="fas fa-info-circle"></i> 
+                            Click "View All" to see detailed breakdown of underlying holdings
+                        </p>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Overlap Warning -->
+                {% if holding.has_overlap %}
+                <div class="overlap-warning">
+                    <i class="fas fa-exclamation-triangle overlap-icon"></i>
+                    <strong>Overlap Warning:</strong> This stock is also held in your ETFs/mutual funds.
+                    <div class="mt-2 small">
+                        <strong>Direct holding:</strong> ${{ "{:,.2f}".format(holding.overlap_sources.direct_value) }}<br>
+                        <strong>Through funds:</strong> ${{ "{:,.2f}".format(holding.overlap_sources.underlying_value) }}
+                        {% if holding.overlap_sources.underlying_sources %}
+                        in {{ holding.overlap_sources.underlying_sources|length }} fund(s)
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            No holdings found. Upload a CSV file from the <a href="/">dashboard</a> to get started.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        function toggleHolding(symbol) {
+            const row = document.getElementById(`holding-${symbol}`);
+            const breakdown = document.getElementById(`breakdown-${symbol}`);
+            const underlying = document.getElementById(`underlying-${symbol}`);
+            
+            // Toggle expanded class
+            row.classList.toggle('expanded');
+            
+            // Toggle breakdown visibility
+            if (breakdown) {
+                breakdown.classList.toggle('show');
+            }
+            
+            // Toggle underlying visibility
+            if (underlying) {
+                underlying.classList.toggle('show');
+            }
+        }
+        
+        function loadUnderlyingDetails(symbol) {
+            // This will be implemented with an AJAX call to fetch underlying details
+            // For now, just show a placeholder
+            const detailsDiv = document.getElementById(`underlying-details-${symbol}`);
+            detailsDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-spinner fa-spin"></i> Loading underlying holdings for ${symbol}...
+                </div>
+            `;
+            
+            // TODO: Implement AJAX call to get underlying holdings
+            // For now, we'll add this in the next iteration
+        }
+        
+        // Collapse all holdings by default on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Keep them expanded for now to show functionality
+            // Later we can collapse by default
+        });
+    </script>
+</body>
+</html>

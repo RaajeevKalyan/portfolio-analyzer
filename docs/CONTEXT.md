@@ -12,7 +12,7 @@ A local, Docker-based Flask web app that aggregates portfolio data from CSV expo
 - **Backend**: Flask + Gunicorn + SQLAlchemy + SQLite (file-based, NOT a container) + Pandas (CSV parsing)
 - **Frontend**: Bootstrap 5 + Chart.js + Vanilla JS
 - **Infrastructure**: Docker (2 containers: nginx + Flask app)
-- **Data Sources**: CSV files from brokers + mstarpy (ETF/MF holdings)
+- **Data Sources**: CSV files from brokers + mstarpy 8.0.3 (ETF/MF holdings)
 - **Security**: File upload validation, OWASP hardening, TLS 1.2+
 
 ### Container Architecture (2 Containers)
@@ -22,19 +22,39 @@ A local, Docker-based Flask web app that aggregates portfolio data from CSV expo
 
 SQLite runs in-process within the Flask app. No separate database container needed.
 
-## Core Features
-1. Multi-broker CSV import (drag-and-drop or browse)
-2. Portfolio aggregation and position consolidation across brokers
-3. ETF/MF underlying holdings analysis (top 50 via mstarpy, fallback to top 25)
-4. Risk analysis:
+## Implementation Status
+
+### ✅ Phase 1: Complete
+- CSV upload and parsing (Merrill Lynch format working)
+- Database schema with all tables
+- Dashboard showing broker cards with net worth
+- ETF/Mutual Fund holdings resolution via mstarpy 8.0.3
+- Background task for resolving underlying holdings
+- Underlying holdings stored in JSON format in `Holding.underlying_holdings` field
+
+### 🚧 Phase 2: In Progress
+- Holdings aggregation table
+- ETF/MF expansion view
+- Overlap detection
+
+### ⏳ Phase 3: Planned
+- Risk analysis and charts
+- Historical trends
+- Snapshot management
+
+## Core Features (Implemented)
+1. ✅ Multi-broker CSV import (drag-and-drop or browse)
+2. ✅ Portfolio aggregation and position consolidation across brokers
+3. ✅ ETF/MF underlying holdings analysis (via mstarpy)
+4. ⏳ Risk analysis (in progress):
    - Stock concentration (>20% = red flag)
    - ETF/MF overlap (>70% = high risk)
    - Sector concentration
    - Geographic exposure
-5. Historical trend tracking (user-configurable snapshot retention, default 25)
-6. Data management (clear history, reset all data)
-7. Light/dark theme toggle
-8. Broker-specific CSV parsers for format variations
+5. ⏳ Historical trend tracking (user-configurable snapshot retention, default 25)
+6. ⏳ Data management (clear history, reset all data)
+7. ❌ Light/dark theme toggle (not yet implemented)
+8. ✅ Broker-specific CSV parsers for format variations
 
 ## Architecture Decisions
 
@@ -44,14 +64,17 @@ SQLite runs in-process within the Flask app. No separate database container need
 - **PortfolioSnapshot**: Point-in-time portfolio state per broker
 - **AggregateSnapshot**: Combined snapshot across all brokers
 - **Holding**: Individual positions (stocks, ETFs, MFs)
-- **UnderlyingHolding**: Resolved ETF/MF constituents
-- **RiskMetrics**: Calculated risk indicators for aggregate portfolio
+  - `underlying_holdings`: JSON field storing resolved ETF/MF constituents
+  - `underlying_parsed`: Boolean flag indicating if resolution attempted
+- **UnderlyingHolding**: (FUTURE) Resolved ETF/MF constituents aggregated across portfolio
+- **RiskMetrics**: (FUTURE) Calculated risk indicators for aggregate portfolio
 
 ### Key Workflows
 1. **First-time setup**: Dashboard → Upload CSV to broker card → Parse & store → Show net worth
-2. **Manual refresh**: Download new CSV from broker → Upload to card → Create new snapshot → Recalculate risk
-3. **Historical view**: Fetch last N aggregate snapshots → Build time-series → Render charts
-4. **Data cleanup**: Confirm → Delete old snapshots OR reset entire database
+2. **Manual refresh**: Download new CSV from broker → Upload to card → Create new snapshot → Background task resolves ETF/MF holdings
+3. **Holdings resolution**: Background thread calls mstarpy → Fetches top holdings → Stores as JSON in `Holding.underlying_holdings`
+4. **Historical view**: (TODO) Fetch last N aggregate snapshots → Build time-series → Render charts
+5. **Data cleanup**: (TODO) Confirm → Delete old snapshots OR reset entire database
 
 ### Security Approach
 - **File Uploads**: Size limits (10MB), extension validation (.csv only), content verification
@@ -65,72 +88,175 @@ SQLite runs in-process within the Flask app. No separate database container need
 portfolio-analyzer/
 ├── docker-compose.yml          # Service orchestration
 ├── Dockerfile                  # Flask app container
-├── requirements.txt            # Python dependencies
+├── requirements.txt            # Python dependencies (includes mstarpy==8.0.3)
 ├── .env                        # Secrets (gitignored)
 ├── nginx/
 │   ├── Dockerfile              # nginx container
 │   ├── nginx.conf              # Proxy config with security
 │   └── ssl/                    # Self-signed certificates
 ├── app/
-│   ├── main.py                 # Flask entry point
+│   ├── main.py                 # Flask entry point, route registration
 │   ├── config.py               # Configuration
 │   ├── models.py               # SQLAlchemy models
-│   ├── database.py             # DB connection
-│   ├── encryption.py           # Fernet wrapper
-│   ├── routes/                 # Flask routes
-│   │   ├── dashboard.py        # Main view, broker cards
-│   │   ├── upload.py           # CSV upload handling
-│   │   ├── portfolio.py        # Holdings table
-│   │   ├── settings.py         # User preferences
-│   │   └── api.py              # AJAX endpoints
-│   ├── services/               # Business logic
-│   │   ├── csv_parser_base.py    # Abstract CSV parser
-│   │   ├── merrill_csv_parser.py  # Merrill format
-│   │   ├── fidelity_csv_parser.py # Fidelity format
-│   │   ├── webull_csv_parser.py   # Webull format
-│   │   ├── robinhood_csv_parser.py # Robinhood format
-│   │   ├── schwab_csv_parser.py   # Schwab format
-│   │   ├── holdings_parser.py     # mstarpy + fallback
-│   │   ├── portfolio_aggregator.py
-│   │   └── risk_analyzer.py
+│   ├── database.py             # DB connection & session management
+│   ├── routes/
+│   │   ├── __init__.py         # Route imports
+│   │   └── upload.py           # CSV upload handling with background resolver
+│   ├── services/
+│   │   ├── csv_parser_base.py          # Abstract CSV parser
+│   │   ├── merrill_csv_parser.py       # Merrill format (IMPLEMENTED)
+│   │   ├── holdings_resolver.py        # ETF/MF resolution via mstarpy 8.0.3
+│   │   ├── fidelity_csv_parser.py      # Fidelity format (TODO)
+│   │   ├── webull_csv_parser.py        # Webull format (TODO)
+│   │   ├── robinhood_csv_parser.py     # Robinhood format (TODO)
+│   │   └── schwab_csv_parser.py        # Schwab format (TODO)
 │   ├── utils/                  # Helpers
 │   ├── static/                 # CSS, JS, images
-│   └── templates/              # Jinja2 templates
+│   └── templates/
+│       └── dashboard.html      # Main dashboard with broker cards
 ├── data/                       # SQLite database (gitignored)
-└── logs/                       # Application logs (gitignored)
+├── uploads/                    # Uploaded CSV files (gitignored)
+├── logs/                       # Application logs (gitignored)
+└── test_holdings_resolver.py  # CLI testing tool for resolver
+```
+
+## Implemented Routes
+
+### Main Application (`app/main.py`)
+- `GET /` - Dashboard showing broker cards and net worth
+- `GET /health` - Health check endpoint
+
+### Upload Blueprint (`app/routes/upload.py`)
+- `POST /upload` - Handle CSV file upload
+  - Validates file and broker
+  - Parses CSV using broker-specific parser
+  - Stores snapshot and holdings in database
+  - Triggers background task to resolve ETF/MF holdings
+  - Returns JSON response with snapshot details
+
+## ETF/MF Holdings Resolution
+
+### mstarpy 8.0.3 Integration
+The holdings resolver uses mstarpy to fetch underlying holdings for ETFs and mutual funds.
+
+**Initialization:**
+```python
+fund = mstarpy.Funds(term=symbol, pageSize=1)
+holdings_df = fund.holdings()  # Returns pandas DataFrame
+```
+
+**DataFrame Structure:**
+- 64 rows (holdings) × 57 columns
+- Key columns: `secId`, `ticker`, `securityName`, `weighting`
+- `weighting` is percentage (e.g., 3.70392 = 3.70%)
+
+**Process:**
+1. Upload CSV with ETF/MF → Stored as `Holding` with `underlying_parsed=False`
+2. Background thread calls `resolve_snapshot_holdings(snapshot_id)`
+3. For each ETF/MF: `mstarpy.Funds(term=symbol).holdings()`
+4. Parse DataFrame → Extract symbol, name, weight
+5. Calculate estimated value: `weight × total_value`
+6. Store as JSON in `Holding.underlying_holdings`
+7. Set `underlying_parsed=True`
+
+**Example Data:**
+```json
+[
+  {
+    "symbol": "NVDA",
+    "name": "NVIDIA Corp",
+    "weight": 0.037039,
+    "value": 137.76,
+    "shares": null
+  },
+  ...
+]
+```
+
+### Resolver Functions
+- `HoldingsResolver.resolve_holding()` - Resolve single ETF/MF
+- `resolve_snapshot_holdings(snapshot_id)` - Resolve all ETF/MFs in a snapshot
+- `resolve_all_unresolved_holdings()` - Backfill all unresolved holdings
+
+### Testing
+```bash
+# Test single symbol
+docker-compose exec app python test_holdings_resolver.py DBMAX mutual_fund 3721.29
+
+# Resolve all unresolved
+docker-compose exec app python test_holdings_resolver.py --resolve-all
+
+# Resolve specific snapshot
+docker-compose exec app python test_holdings_resolver.py --snapshot 1
+```
+
+## Merrill Lynch CSV Format
+
+Merrill CSVs have a complex multi-section format:
+
+### Structure:
+1. **Account summary** (skip) - Single quotes or comma-prefixed lines
+2. **Empty line with `""`**
+3. **Holdings header row** - Starts with `"Symbol "`
+4. **Holdings data rows**
+5. **Footer section** - "Balances", "Total", "Cash balance", etc.
+
+### Parser Logic:
+1. Find header row containing "Symbol", "Description", "Quantity"
+2. Extract data rows until footer markers ("Balances", "Total", etc.)
+3. Filter out empty lines and comma-only lines
+4. Parse holdings with flexible column matching
+5. Handle Merrill's inconsistent number formats (e.g., `$14,80.76`)
+
+### Example:
+```csv
+, "IRRA-Edge 43X-40L72" ,"Value" ,"Day's Value Change"
+"" ,"$10,480.76" ,"$0.00 0.00%"
+
+""
+"Symbol " ,"Description" ,"Quantity" ,"Value" ,"Price"
+"AMD" ,"ADVANCED MICRO DEVICES" ,"57" ,"$14,801.76" ,"$259.68"
+"DBMAX" ,"BNY MELLON SMALL/MID CAP" ,"171.567" ,"$3,721.29" ,"$21.69"
+""
 ```
 
 ## UI Layout
 
-### Dashboard
+### Dashboard (Implemented)
 ```
-┌─────────────────────────────────────────────────────┐
-│ Navbar: Logo | Dashboard | Portfolio | History | Settings | [Theme] │
-├─────────────────────────────────────────────────────┤
-│ Total Net Worth: $1,234,567 | Last Updated: Jan 25 │
-│                                                     │
-│ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│ │ Merrill  │ │ Fidelity │ │  Webull  │  Broker   │
-│ │ $267,000 │ │ $456,789 │ │ $100,278 │  Cards    │
-│ │[Upload]  │ │[Upload]  │ │[Upload]  │            │
-│ └──────────┘ └──────────┘ └──────────┘            │
-│ ┌──────────┐ ┌──────────┐                         │
-│ │Robinhood │ │  Schwab  │                         │
-│ │ $89,500  │ │ $321,000 │                         │
-│ │[Upload]  │ │[Upload]  │                         │
-│ └──────────┘ └──────────┘                         │
-│                                                     │
-│ [Risk Alerts] | [Top Holdings Table]               │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ Navbar: Logo | Portfolio Risk Analyzer | [Theme]            │
+├─────────────────────────────────────────────────────────────┤
+│ Total Net Worth: $18,523.05 | Last Updated: Jan 26          │
+│                                                               │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
+│ │ Merrill  │ │ Fidelity │ │  Webull  │ │Robinhood │        │
+│ │$18,523   │ │   [Upload │ │  [Upload │ │  [Upload │        │
+│ │2 pos     │ │    Zone]  │ │   Zone]  │ │   Zone]  │        │
+│ │[Update]  │ │           │ │          │ │          │        │
+│ └──────────┘ └──────────┘ └──────────┘ └──────────┘        │
+│ ┌──────────┐                                                 │
+│ │  Schwab  │                                                 │
+│ │ [Upload  │                                                 │
+│ │  Zone]   │                                                 │
+│ └──────────┘                                                 │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Color Palette
-- Light: White bg (#FFFFFF), Primary (#0066CC), Danger (#DC3545)
-- Dark: Dark bg (#1A1D21), Primary (#4A9EFF), Danger (#FF6B6B)
+### Holdings Table (Phase 2 - In Progress)
+Will show aggregated holdings with:
+- Same symbol grouped across brokers
+- Broker breakdown as sub-rows
+- ETF/MF chevron for expansion
+- Underlying holdings display
+- Overlap warnings
 
-### Charts
+### Charts (Phase 3 - Planned)
 - Chart.js for all visualizations
-- Donut (portfolio allocation), Pie (concentrations), Line (trends), Bar (sectors/geography)
+- Donut (portfolio allocation)
+- Pie (concentrations)
+- Line (trends)
+- Bar (sectors/geography)
 
 ## Critical Constraints
 
@@ -142,7 +268,7 @@ portfolio-analyzer/
 5. **Localhost deployment**: No public cloud features
 6. **SQLite database**: No migration to other databases
 7. **HTTPS only**: Port 80 must redirect to 443
-8. **Supported brokers**: Merrill Lynch, Fidelity, Webull, Robinhood, Schwab
+8. **Supported brokers**: Merrill Lynch (working), Fidelity, Webull, Robinhood, Schwab (TODO)
 
 ### MUST FOLLOW:
 1. **OWASP Top 10**: All mitigations documented in SECURITY_SPEC.md
@@ -151,106 +277,86 @@ portfolio-analyzer/
 4. **CSRF protection**: All state-changing operations protected
 5. **File upload security**: Size limits, extension validation, content verification
 6. **No browser storage**: localStorage/sessionStorage not used (artifacts limitation)
+7. **mstarpy 8.0.3 API**: Use `Funds(term=symbol, pageSize=1)` - NO `country` parameter
 
-## Common Modification Patterns
+## Common Issues & Solutions
 
-### Adding a New Broker
-1. Create `app/services/[broker]_csv_parser.py` extending `csv_parser_base.py`
-2. Implement parser methods: `validate_csv()`, `parse_csv()`, `extract_account_number()`
-3. Add broker to allowed list in validators
-4. Add broker card to dashboard template
-5. Update broker color scheme in CSS
-6. Test with real CSV from that broker
+### Docker Image Caching
+**Problem**: Code changes not picked up after rebuild
 
-### Adding CSV Format Variations
-1. Identify the broker (e.g., Merrill Lynch)
-2. Open `app/services/merrill_csv_parser.py`
-3. Add format detection logic in `parse_csv()`
-4. Handle column name variations (case-insensitive matching)
-5. Add number/date parsing flexibility
-6. Test with multiple CSV samples
-
-### Adding a New Risk Metric
-1. Add calculation to `app/services/risk_analyzer.py`
-2. Add field to `RiskMetrics` model in `app/models.py`
-3. Create database migration (Alembic)
-4. Update dashboard template to display metric
-5. Add chart visualization in `static/js/charts.js`
-
-### Changing UI Theme
-1. Modify `static/css/light-theme.css` or `dark-theme.css`
-2. Update color variables in `:root`
-3. Test both themes for contrast/readability
-4. No changes to Bootstrap base needed
-
-### Adjusting Security Settings
-1. nginx config: `nginx/nginx.conf` (headers, ciphers, timeouts)
-2. Flask config: `app/config.py` (session, CSRF, cookies, file upload limits)
-3. File upload: `app/routes/upload.py` (max file size, allowed extensions)
-4. Always test with SSL Labs after changes
-
-## Prompt Template for Modifications
-
+**Solution**:
+```bash
+docker-compose down
+docker-compose build --no-cache app
+docker-compose up -d
 ```
-I need to [describe what you want to change/add].
 
-Context: [Paste relevant sections from CONTEXT.md]
+### Holdings Not Resolving
+**Problem**: ETF/MF marked as `underlying_parsed=True` but no data
 
-Current behavior: [Describe current state]
-Desired behavior: [Describe what you want]
+**Solution**:
+```bash
+# Check mstarpy can fetch data
+docker-compose exec app python -c "
+import mstarpy
+fund = mstarpy.Funds(term='VTI')
+print(fund.holdings().head())
+"
 
-Constraints:
-- [Any specific requirements]
-- Must maintain [security/architecture principles]
+# Reset parsed flags
+docker-compose exec app python -c "
+from app.database import db_session
+from app.models import Holding
+with db_session() as session:
+    holdings = session.query(Holding).filter(
+        Holding.asset_type.in_(['etf', 'mutual_fund'])
+    ).all()
+    for h in holdings:
+        h.underlying_parsed = False
+"
 
-Files likely affected:
-- [List files you think need changes]
+# Re-run resolver
+docker-compose exec app python -c "
+from app.services.holdings_resolver import resolve_all_unresolved_holdings
+print(resolve_all_unresolved_holdings())
+"
+```
 
-Please:
-1. Confirm approach before generating code
-2. Show only changed sections (not entire files)
-3. Explain any security/architecture implications
+### F-String Syntax Errors
+**Problem**: Nested f-strings with dictionary access cause syntax errors
+
+**Wrong**:
+```python
+f"Data: {[f\"{x['key']}\" for x in items]}"  # SyntaxError
+```
+
+**Correct**:
+```python
+# Move logic outside f-string
+data = [x['key'] for x in items]
+f"Data: {data}"
 ```
 
 ## Development Workflow
 
 ### Making Code Changes
 1. Modify code in `app/` directory
-2. Test locally: `docker-compose up --build`
-3. Verify functionality in browser
+2. Test syntax: `python3 -m py_compile <file>`
+3. Rebuild: `docker-compose down && docker-compose up -d --build`
 4. Check logs: `docker-compose logs -f app`
 5. If OK, commit changes
 
 ### Database Schema Changes
 1. Modify models in `app/models.py`
-2. Create migration: `alembic revision --autogenerate -m "description"`
-3. Review migration file
-4. Apply migration: `alembic upgrade head`
-5. Test data integrity
+2. Database auto-creates tables on startup via `init_db()`
+3. For major changes, may need to delete `data/portfolio.db` and restart
+4. Test data integrity
 
 ### Debugging
 - **App errors**: `docker-compose logs app`
-- **nginx errors**: `docker-compose logs nginx`
-- **Database issues**: `sqlite3 data/portfolio.db`
-- **OAuth flow**: Enable debug logging in `app/routes/auth.py`
-
-## Known Limitations
-
-### Data Sources
-- CSV export from brokers may have format variations → parsers handle common patterns
-- mstarpy may not return holdings for all ETFs/MFs → fallback to custom scraper
-- User must manually download CSVs from broker websites → document export instructions
-
-### Browser Compatibility
-- Requires modern browser (Chrome, Firefox, Safari latest)
-- Self-signed SSL certificate warning expected
-- No Internet Explorer support
-
-### Performance
-- Large CSV files (>1000 positions) may take 10-20s to parse
-- Chart rendering may be slow with >100 historical snapshots
-- SQLite has concurrent write limitations (single user mitigates this)
-- File upload progress indicators prevent UI freezing
+- **Import errors**: `docker-compose run --rm app python -c "from app.main import app"`
+- **Database issues**: `docker-compose exec app python -c "from app.database import db_session; ..."`
+- **Holdings resolver**: `docker-compose exec app python test_holdings_resolver.py --resolve-all`
 
 ## Version Information
 - Python: 3.11
@@ -259,6 +365,9 @@ Please:
 - Bootstrap: 5.3
 - Chart.js: 4.x
 - nginx: 1.25
+- mstarpy: 8.0.3
+- pandas: Latest
+- Gunicorn: Latest
 
 ## Quick Commands
 
@@ -266,8 +375,10 @@ Please:
 # Start services
 docker-compose up -d
 
-# Rebuild and restart app only
-docker-compose up -d --build app
+# Rebuild without cache (when code changes don't work)
+docker-compose down
+docker-compose build --no-cache app
+docker-compose up -d
 
 # View logs
 docker-compose logs -f app
@@ -278,42 +389,57 @@ docker-compose down
 # Backup database
 cp data/portfolio.db backups/portfolio_$(date +%Y%m%d).db
 
-# Generate new encryption key
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Reset database (delete and restart)
+docker-compose down
+rm -f data/portfolio.db
+docker-compose up -d
 
-# Test nginx config
-docker-compose exec nginx nginx -t
+# Test holdings resolver
+docker-compose exec app python test_holdings_resolver.py VTI etf 10000
+docker-compose exec app python test_holdings_resolver.py --resolve-all
 
-# Access database
-sqlite3 data/portfolio.db
+# Check database contents
+docker-compose exec app python -c "
+from app.database import db_session
+from app.models import Holding
+with db_session() as session:
+    holdings = session.query(Holding).all()
+    for h in holdings:
+        print(f'{h.symbol}: {h.asset_type}, parsed={h.underlying_parsed}')
+"
+
+# Access database directly
+docker-compose exec app sqlite3 /app/data/portfolio.db
 
 # Check SSL configuration
 openssl s_client -connect localhost:443 -servername localhost
 ```
 
-## Getting Help
+## Next Steps (Phase 2)
 
-### For Code Changes
-Paste this CONTEXT.md + specific request using template above
+1. Create holdings aggregation route (`/holdings`)
+2. Build aggregation service to combine holdings across brokers
+3. Create holdings table UI with:
+   - Grouped by symbol
+   - Broker breakdown
+   - ETF/MF expansion chevron
+   - Underlying holdings display
+   - Overlap detection
+4. Add filtering and sorting
 
-### For Architecture Questions
-Reference: ARCHITECTURE.md for system design details
-
-### For Security Changes
-Reference: SECURITY_SPEC.md for OWASP compliance requirements
-
-### For UI Changes
-Reference: UI_SPEC.md for design system and components
-
-### For Docker Issues
-Reference: DOCKER_SETUP.md for container configuration
+## Repository Structure
+- **Bitbucket**: https://bitbucket.org/raajeev/portfolio-analyzer
+- **Main branch**: Contains all working code
+- **Docker containers**: portfolio-app (Flask), portfolio-nginx (reverse proxy)
 
 ---
 
 ## 📌 Remember
 - This is a **single-user**, **localhost-only** tool
 - Security is critical: File uploads must be validated, data must be protected
-- Manual CSV upload only: No automatic data pulls or OAuth (for now)
+- Manual CSV upload only: No automatic data pulls
 - Desktop browsers only: No mobile responsive design needed
-- Always test SSL configuration after nginx changes
-- Keep broker CSV formats documented (they may change)
+- Always rebuild with `--no-cache` when debugging code changes
+- mstarpy 8.0.3 API uses `Funds(term=symbol)` - NO `country` parameter
+- F-strings with nested quotes need special handling
+- Background tasks run in separate threads for ETF/MF resolution
