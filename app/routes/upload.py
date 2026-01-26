@@ -56,15 +56,25 @@ def upload_csv():
             }
         }
     """
+    # DIAGNOSTIC LOGGING
+    print("="*80)
+    print("UPLOAD ENDPOINT CALLED!")
+    print(f"Request method: {request.method}")
+    print(f"Request files: {list(request.files.keys())}")
+    print(f"Request form: {dict(request.form)}")
+    print("="*80)
+    
     try:
         # Validate request
         if 'file' not in request.files:
+            print("ERROR: No file in request.files")
             return jsonify({
                 'success': False,
                 'message': 'No file provided'
             }), 400
         
         if 'broker' not in request.form:
+            print("ERROR: No broker in request.form")
             return jsonify({
                 'success': False,
                 'message': 'Broker name not specified'
@@ -73,14 +83,18 @@ def upload_csv():
         file = request.files['file']
         broker_name = request.form['broker'].lower()
         
+        print(f"File: {file.filename}, Broker: {broker_name}")
+        
         # Validate file
         if file.filename == '':
+            print("ERROR: Empty filename")
             return jsonify({
                 'success': False,
                 'message': 'No file selected'
             }), 400
         
         if not allowed_file(file.filename):
+            print(f"ERROR: File extension not allowed: {file.filename}")
             return jsonify({
                 'success': False,
                 'message': 'Invalid file type. Only CSV files are allowed.'
@@ -88,6 +102,8 @@ def upload_csv():
         
         # Validate broker
         if broker_name not in PARSERS:
+            print(f"ERROR: Unsupported broker: {broker_name}")
+            print(f"Available parsers: {list(PARSERS.keys())}")
             return jsonify({
                 'success': False,
                 'message': f'Unsupported broker: {broker_name}. Supported: {", ".join(PARSERS.keys())}'
@@ -101,14 +117,20 @@ def upload_csv():
         file_path = os.path.join(upload_folder, f"{broker_name}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}")
         file.save(file_path)
         
+        print(f"File saved to: {file_path}")
         logger.info(f"Uploaded file saved: {file_path}")
         
         # Parse CSV
         parser_class = PARSERS[broker_name]
+        print(f"Using parser: {parser_class.__name__}")
         parser = parser_class()
+        print("Parser instantiated successfully")
         
         # Validate CSV format
+        print("Validating CSV format...")
         is_valid, error_message = parser.validate_csv(file_path)
+        print(f"Validation result: {is_valid}, Error: {error_message}")
+        
         if not is_valid:
             os.remove(file_path)  # Clean up
             return jsonify({
@@ -118,9 +140,20 @@ def upload_csv():
         
         # Parse CSV data
         try:
+            print("Parsing CSV data...")
             parsed_data = parser.parse_csv(file_path)
+            print(f"Parse complete! Holdings: {len(parsed_data.get('holdings', []))}")
+            print(f"Total value: ${parsed_data.get('total_value', 0)}")
+            print(f"Account: ***{parsed_data.get('account_number_last4', 'None')}")
+            
+            # Print first holding as sample
+            if parsed_data.get('holdings'):
+                first = parsed_data['holdings'][0]
+                print(f"Sample holding: {first['symbol']} - {first['quantity']} @ ${first['price']}")
+            
         except Exception as e:
-            logger.error(f"Error parsing CSV: {e}")
+            print(f"ERROR during parsing: {e}")
+            logger.error(f"Error parsing CSV: {e}", exc_info=True)
             os.remove(file_path)  # Clean up
             return jsonify({
                 'success': False,
@@ -128,16 +161,26 @@ def upload_csv():
             }), 400
         
         # Store in database
-        snapshot_id = store_portfolio_data(
-            broker_name=broker_name,
-            parsed_data=parsed_data,
-            csv_filename=filename
-        )
+        print("Storing data in database...")
+        try:
+            snapshot_id = store_portfolio_data(
+                broker_name=broker_name,
+                parsed_data=parsed_data,
+                csv_filename=filename
+            )
+            print(f"Data stored! Snapshot ID: {snapshot_id}")
+        except Exception as e:
+            print(f"ERROR storing data: {e}")
+            logger.error(f"Error storing data: {e}", exc_info=True)
+            raise
         
         # Clean up uploaded file (optional - keep for debugging)
         # os.remove(file_path)
         
         logger.info(f"Successfully processed {broker_name} CSV: {len(parsed_data['holdings'])} holdings, ${parsed_data['total_value']}")
+        
+        print(f"SUCCESS! Returning response...")
+        print("="*80)
         
         return jsonify({
             'success': True,
@@ -152,12 +195,14 @@ def upload_csv():
         }), 200
         
     except Exception as e:
+        print(f"EXCEPTION in upload_csv: {e}")
         logger.error(f"Upload error: {e}", exc_info=True)
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'message': f'Server error: {str(e)}'
         }), 500
-
 
 def store_portfolio_data(broker_name: str, parsed_data: dict, csv_filename: str) -> int:
     """

@@ -75,9 +75,11 @@ class MerrillCSVParser(CSVParserBase):
         Preprocess Merrill Lynch CSV to extract the data section
         
         Merrill CSVs have this structure:
-        1. Account summary in single quotes (skip)
-        2. Data section in double quotes (extract this)
-        3. Footer info (skip)
+        1. Account summary (skip)
+        2. Empty line with ""
+        3. Data section starting with column headers
+        4. Data rows
+        5. Footer with totals (skip)
         
         Returns:
             pd.DataFrame: Extracted data or None
@@ -85,82 +87,82 @@ class MerrillCSVParser(CSVParserBase):
         try:
             # Read entire file as text
             with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+                lines = f.readlines()
             
-            # Method 1: Find data section between "" markers (on separate lines)
-            # Look for a line with just "", then content, then another line with just ""
-            lines = content.split('\n')
-            start_idx = None
-            end_idx = None
+            # Find the header row (starts with "Symbol")
+            header_idx = None
+            data_start_idx = None
             
             for i, line in enumerate(lines):
-                stripped = line.strip().strip('"').strip()
-                if stripped == '' and start_idx is None:
-                    # Found first "" marker
-                    start_idx = i + 1
-                elif stripped == '' and start_idx is not None and i > start_idx + 1:
-                    # Found closing "" marker
-                    end_idx = i
+                # Look for the column header line
+                if 'Symbol' in line and 'Description' in line and 'Quantity' in line:
+                    header_idx = i
+                    data_start_idx = i + 1
                     break
             
-            if start_idx is not None and end_idx is not None:
-                # Extract data section
-                data_lines = lines[start_idx:end_idx]
-                data_section = '\n'.join(data_lines)
-                
-                # Save to temporary file
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
-                    tmp.write(data_section)
-                    tmp_path = tmp.name
-                
-                # Load as DataFrame
-                df = pd.read_csv(tmp_path, skipinitialspace=True, on_bad_lines='skip')
-                
-                # Clean up temp file
-                os.unlink(tmp_path)
-                
-                # Strip whitespace from column names
-                df.columns = df.columns.str.strip()
-                
-                # Remove any empty rows
-                df = df.dropna(how='all')
-                
-                logger.info(f"Extracted Merrill data section: {len(df)} rows, {len(df.columns)} columns")
-                logger.debug(f"Columns: {list(df.columns)}")
-                
-                self.df = df
-                return df
+            if header_idx is None:
+                logger.error("Could not find data section with Symbol/Description/Quantity columns")
+                return None
             
-            # Method 2: Try regex approach with modified pattern
-            logger.info("Line-by-line approach failed, trying regex...")
-            pattern = r'""\s*\n(.*?)\n\s*""'
-            matches = re.findall(pattern, content, re.DOTALL)
+            # Find where data ends (look for "Balances", "Total", or empty lines)
+            data_end_idx = len(lines)
+            for i in range(data_start_idx, len(lines)):
+                line_content = lines[i].strip().strip('"').strip()
+                # Stop at footer markers
+                if any(marker in line_content for marker in ['Balances', 'Total', 'Cash balance', 'Money accounts']):
+                    data_end_idx = i
+                    break
+                # Stop at empty lines after data
+                if line_content == '' or line_content == ',':
+                    # Check if this is truly the end (no more data after)
+                    has_more_data = False
+                    for j in range(i+1, min(i+5, len(lines))):
+                        if lines[j].strip() and 'Symbol' not in lines[j] and '"Total"' not in lines[j]:
+                            has_more_data = True
+                            break
+                    if not has_more_data:
+                        data_end_idx = i
+                        break
             
-            if matches:
-                # Usually the data section is the largest match
-                data_section = max(matches, key=len)
-                
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
-                    tmp.write(data_section)
-                    tmp_path = tmp.name
-                
-                df = pd.read_csv(tmp_path, skipinitialspace=True, on_bad_lines='skip')
-                os.unlink(tmp_path)
-                
-                df.columns = df.columns.str.strip()
-                df = df.dropna(how='all')
-                
-                logger.info(f"Extracted Merrill data section (regex): {len(df)} rows, {len(df.columns)} columns")
-                logger.debug(f"Columns: {list(df.columns)}")
-                
-                self.df = df
-                return df
+            # Extract header and data lines
+            header_line = lines[header_idx]
+            data_lines = lines[data_start_idx:data_end_idx]
             
-            # Method 3: If no quotes found, try loading directly
-            logger.info("No quoted sections found, trying direct CSV load...")
-            df = pd.read_csv(file_path, skipinitialspace=True, on_bad_lines='skip')
+            # Filter out empty lines and lines that are just commas
+            data_lines = [line for line in data_lines if line.strip() and line.strip() != ',' and line.strip() != '""']
+            
+            # Combine into CSV content
+            csv_content = header_line + ''.join(data_lines)
+            
+            logger.debug(f"Extracted CSV content:\n{csv_content[:500]}")
+            
+            # Save to temporary file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
+                tmp.write(csv_content)
+                tmp_path = tmp.name
+            
+            # Load as DataFrame
+            df = pd.read_csv(tmp_path, skipinitialspace=True, on_bad_lines='skip')
+            
+            # Clean up temp file
+            os.unlink(tmp_path)
+            
+            # Strip whitespace from column names
             df.columns = df.columns.str.strip()
+            
+            # Remove any empty rows
             df = df.dropna(how='all')
+            
+            # Filter out rows where Symbol is empty or contains footer keywords
+            if 'Symbol' in df.columns:
+                df = df[df['Symbol'].notna()]
+                df = df[~df['Symbol'].str.contains('Balances|Total|Cash|Money|Pending', case=False, na=False)]
+            
+            logger.info(f"Extracted Merrill data section: {len(df)} rows, {len(df.columns)} columns")
+            logger.debug(f"Columns: {list(df.columns)}")
+            
+            if len(df) > 0:
+                logger.debug(f"First row: {df.iloc[0].to_dict()}")
             
             self.df = df
             return df
@@ -169,8 +171,9 @@ class MerrillCSVParser(CSVParserBase):
             logger.error(f"Error preprocessing Merrill CSV: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            return None
-    
+            return None    
+
+
     def extract_account_number(self, df: pd.DataFrame) -> Optional[str]:
         """
         Extract account number from Merrill Lynch CSV
