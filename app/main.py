@@ -1,7 +1,7 @@
 """
 Flask Application Entry Point
 """
-from flask import Flask, render_template_string
+from flask import Flask, render_template
 from app.config import get_config
 import logging
 from logging.handlers import RotatingFileHandler
@@ -55,91 +55,70 @@ def setup_logging(app):
 def register_routes(app):
     """Register application routes"""
     
+    # Register blueprints
+    from app.routes.upload import upload_bp
+    app.register_blueprint(upload_bp)
+    
     @app.route('/')
     def index():
-        """Home page - temporary hello world"""
-        html = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Portfolio Risk Analyzer</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-            <style>
-                body {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    min-height: 100vh;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .welcome-card {
-                    background: white;
-                    border-radius: 20px;
-                    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                    padding: 3rem;
-                    max-width: 600px;
-                    text-align: center;
-                }
-                .broker-icons {
-                    display: flex;
-                    justify-content: center;
-                    gap: 1.5rem;
-                    margin: 2rem 0;
-                }
-                .broker-icon {
-                    font-size: 2rem;
-                }
-                .fa-building-columns { color: #CC0000; }
-                .fa-chart-line { color: #00783E; }
-                .fa-chart-simple { color: #5B21B6; }
-                .fa-arrow-trend-up { color: #00C805; }
-                .fa-landmark { color: #00A0DC; }
-            </style>
-        </head>
-        <body>
-            <div class="welcome-card">
-                <h1 class="mb-4">
-                    <i class="fas fa-chart-pie text-primary"></i>
-                    Portfolio Risk Analyzer
-                </h1>
-                <p class="lead text-muted">
-                    Aggregate your investments across multiple brokers and analyze risk concentrations.
-                </p>
+        """Dashboard page"""
+        from app.database import get_session
+        from app.models import BrokerAccount, PortfolioSnapshot
+        from sqlalchemy import func, desc
+        
+        session = get_session()
+        
+        try:
+            # Get all broker accounts with their latest snapshot
+            brokers_data = []
+            supported_brokers = ['merrill', 'fidelity', 'webull', 'robinhood', 'schwab']
+            
+            for broker_name in supported_brokers:
+                broker_account = session.query(BrokerAccount).filter_by(
+                    broker_name=broker_name,
+                    is_active=True
+                ).first()
                 
-                <div class="broker-icons">
-                    <i class="fas fa-building-columns broker-icon" title="Merrill Lynch"></i>
-                    <i class="fas fa-chart-line broker-icon" title="Fidelity"></i>
-                    <i class="fas fa-chart-simple broker-icon" title="Webull"></i>
-                    <i class="fas fa-arrow-trend-up broker-icon" title="Robinhood"></i>
-                    <i class="fas fa-landmark broker-icon" title="Schwab"></i>
-                </div>
-                
-                <div class="alert alert-success" role="alert">
-                    <i class="fas fa-check-circle"></i>
-                    <strong>Application running successfully!</strong>
-                </div>
-                
-                <p class="text-muted small">
-                    <i class="fas fa-lock"></i>
-                    Secure HTTPS connection established<br>
-                    <i class="fas fa-server"></i>
-                    Flask + Gunicorn + nginx
-                </p>
-                
-                <div class="mt-4 pt-4 border-top">
-                    <p class="text-muted small mb-0">
-                        <strong>Next Steps:</strong><br>
-                        Database setup → CSV parsers → Dashboard
-                    </p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        return render_template_string(html)
+                if broker_account:
+                    # Get latest snapshot
+                    latest_snapshot = session.query(PortfolioSnapshot).filter_by(
+                        broker_account_id=broker_account.id
+                    ).order_by(desc(PortfolioSnapshot.snapshot_date)).first()
+                    
+                    brokers_data.append({
+                        'name': broker_name,
+                        'display_name': broker_name.replace('_', ' ').title(),
+                        'has_data': True,
+                        'total_value': float(latest_snapshot.total_value) if latest_snapshot else 0,
+                        'total_positions': latest_snapshot.total_positions if latest_snapshot else 0,
+                        'last_updated': latest_snapshot.snapshot_date.strftime('%b %d, %Y %I:%M %p') if latest_snapshot else None,
+                        'account_last4': broker_account.account_number_last4
+                    })
+                else:
+                    # No data for this broker yet
+                    brokers_data.append({
+                        'name': broker_name,
+                        'display_name': broker_name.replace('_', ' ').title(),
+                        'has_data': False,
+                        'total_value': 0,
+                        'total_positions': 0,
+                        'last_updated': None,
+                        'account_last4': None
+                    })
+            
+            # Calculate total net worth
+            total_net_worth = sum(b['total_value'] for b in brokers_data if b['has_data'])
+            
+        except Exception as e:
+            logger.error(f"Error loading dashboard data: {e}")
+            brokers_data = []
+            total_net_worth = 0
+        finally:
+            session.close()
+        
+        return render_template('dashboard.html', 
+                             brokers=brokers_data,
+                             total_net_worth=total_net_worth)
     
     @app.route('/health')
     def health():

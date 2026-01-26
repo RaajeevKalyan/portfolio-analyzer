@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Risk Analyzer - Dashboard</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        :root {
+            --merrill-color: #CC0000;
+            --fidelity-color: #00783E;
+            --webull-color: #5B21B6;
+            --robinhood-color: #00C805;
+            --schwab-color: #00A0DC;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+        }
+        
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+        }
+        
+        .navbar-badge {
+            background-color: #e6f2ff;
+            color: #0066cc;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .net-worth-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .net-worth-label {
+            font-size: 0.875rem;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .net-worth-value {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #2d3748;
+            line-height: 1;
+        }
+        
+        .broker-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .broker-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+        
+        .broker-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+        }
+        
+        .broker-card.no-data {
+            border: 2px dashed #cbd5e0;
+            background: #f7fafc;
+        }
+        
+        .broker-card.no-data:hover {
+            border-color: #667eea;
+            background: #edf2f7;
+        }
+        
+        .broker-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .broker-card[data-broker="merrill"] .broker-icon { color: var(--merrill-color); }
+        .broker-card[data-broker="fidelity"] .broker-icon { color: var(--fidelity-color); }
+        .broker-card[data-broker="webull"] .broker-icon { color: var(--webull-color); }
+        .broker-card[data-broker="robinhood"] .broker-icon { color: var(--robinhood-color); }
+        .broker-card[data-broker="schwab"] .broker-icon { color: var(--schwab-color); }
+        
+        .broker-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .broker-value {
+            font-size: 1.75rem;
+            font-weight: bold;
+            color: #2d3748;
+            margin: 1rem 0;
+        }
+        
+        .broker-positions {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+        
+        .broker-last-updated {
+            color: #a0aec0;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+        }
+        
+        .upload-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-zone:hover {
+            border-color: #667eea;
+            background-color: #edf2f7;
+        }
+        
+        .upload-zone.dragover {
+            border-color: #667eea;
+            background-color: #e6f2ff;
+        }
+        
+        .btn-upload {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+        
+        .upload-icon {
+            font-size: 3rem;
+            color: #cbd5e0;
+            margin-bottom: 1rem;
+        }
+        
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+        
+        /* IMPROVED NOTIFICATION STYLES */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            width: 420px;
+            max-width: calc(100vw - 40px);
+        }
+        
+        .custom-toast {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0,0,0,0.05);
+            margin-bottom: 1rem;
+            overflow: hidden;
+            animation: slideIn 0.3s ease-out;
+            border-left: 5px solid;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(450px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(450px);
+                opacity: 0;
+            }
+        }
+        
+        .custom-toast.hiding {
+            animation: slideOut 0.3s ease-in forwards;
+        }
+        
+        .custom-toast.toast-success {
+            border-left-color: #10b981;
+        }
+        
+        .custom-toast.toast-error {
+            border-left-color: #ef4444;
+        }
+        
+        .custom-toast.toast-warning {
+            border-left-color: #f59e0b;
+        }
+        
+        .custom-toast.toast-info {
+            border-left-color: #3b82f6;
+        }
+        
+        .toast-header-custom {
+            display: flex;
+            align-items: flex-start;
+            padding: 1.25rem;
+            gap: 1rem;
+        }
+        
+        .toast-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+        
+        .toast-success .toast-icon {
+            background-color: #d1fae5;
+            color: #10b981;
+        }
+        
+        .toast-error .toast-icon {
+            background-color: #fee2e2;
+            color: #ef4444;
+        }
+        
+        .toast-warning .toast-icon {
+            background-color: #fef3c7;
+            color: #f59e0b;
+        }
+        
+        .toast-info .toast-icon {
+            background-color: #dbeafe;
+            color: #3b82f6;
+        }
+        
+        .toast-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .toast-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: #1f2937;
+            margin: 0 0 0.375rem 0;
+        }
+        
+        .toast-message {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin: 0;
+            line-height: 1.5;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        .toast-close {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        
+        .toast-close:hover {
+            background-color: #f3f4f6;
+            color: #4b5563;
+        }
+        
+        .toast-progress {
+            height: 4px;
+            background-color: #f3f4f6;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .toast-progress-bar {
+            height: 100%;
+            background-color: currentColor;
+            transition: width 0.1s linear;
+        }
+        
+        .toast-success .toast-progress-bar {
+            background-color: #10b981;
+        }
+        
+        .toast-error .toast-progress-bar {
+            background-color: #ef4444;
+        }
+        
+        .toast-warning .toast-progress-bar {
+            background-color: #f59e0b;
+        }
+        
+        .toast-info .toast-progress-bar {
+            background-color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-light">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <div class="logo-icon">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+                <span>Portfolio Risk Analyzer</span>
+            </a>
+            <div>
+                <span class="navbar-badge">
+                    <i class="fas fa-shield-alt"></i> Secure • Localhost
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h1 class="mb-2">Portfolio Dashboard</h1>
+                    <p class="mb-0 opacity-75">Manage your investments across multiple brokers</p>
+                </div>
+                <div class="col-md-6">
+                    <div class="net-worth-card">
+                        <div class="net-worth-label">Total Net Worth</div>
+                        <div class="net-worth-value" id="totalNetWorth">$0.00</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container pb-5">
+        <div class="broker-grid">
+            <!-- Merrill Lynch -->
+            <div class="broker-card no-data" data-broker="merrill" id="broker-merrill">
+                <div class="text-center">
+                    <i class="fas fa-building-columns broker-icon"></i>
+                    <div class="broker-name">Merrill Lynch</div>
+                </div>
+                <div class="upload-zone" 
+                     id="upload-zone-merrill"
+                     onclick="triggerUpload('merrill')"
+                     ondrop="handleDrop(event, 'merrill')"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <p class="mb-2"><strong>Drop CSV here</strong></p>
+                    <p class="text-muted small mb-3">or click to browse</p>
+                    <button class="btn btn-upload btn-sm">
+                        <i class="fas fa-file-upload"></i> Upload CSV
+                    </button>
+                </div>
+                <input type="file" id="file-input-merrill" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'merrill')">
+            </div>
+
+            <!-- Fidelity -->
+            <div class="broker-card no-data" data-broker="fidelity" id="broker-fidelity">
+                <div class="text-center">
+                    <i class="fas fa-chart-line broker-icon"></i>
+                    <div class="broker-name">Fidelity</div>
+                </div>
+                <div class="upload-zone" 
+                     id="upload-zone-fidelity"
+                     onclick="triggerUpload('fidelity')"
+                     ondrop="handleDrop(event, 'fidelity')"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <p class="mb-2"><strong>Drop CSV here</strong></p>
+                    <p class="text-muted small mb-3">or click to browse</p>
+                    <button class="btn btn-upload btn-sm">
+                        <i class="fas fa-file-upload"></i> Upload CSV
+                    </button>
+                </div>
+                <input type="file" id="file-input-fidelity" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'fidelity')">
+            </div>
+
+            <!-- Webull -->
+            <div class="broker-card no-data" data-broker="webull" id="broker-webull">
+                <div class="text-center">
+                    <i class="fas fa-chart-simple broker-icon"></i>
+                    <div class="broker-name">Webull</div>
+                </div>
+                <div class="upload-zone" 
+                     id="upload-zone-webull"
+                     onclick="triggerUpload('webull')"
+                     ondrop="handleDrop(event, 'webull')"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <p class="mb-2"><strong>Drop CSV here</strong></p>
+                    <p class="text-muted small mb-3">or click to browse</p>
+                    <button class="btn btn-upload btn-sm">
+                        <i class="fas fa-file-upload"></i> Upload CSV
+                    </button>
+                </div>
+                <input type="file" id="file-input-webull" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'webull')">
+            </div>
+
+            <!-- Robinhood -->
+            <div class="broker-card no-data" data-broker="robinhood" id="broker-robinhood">
+                <div class="text-center">
+                    <i class="fas fa-arrow-trend-up broker-icon"></i>
+                    <div class="broker-name">Robinhood</div>
+                </div>
+                <div class="upload-zone" 
+                     id="upload-zone-robinhood"
+                     onclick="triggerUpload('robinhood')"
+                     ondrop="handleDrop(event, 'robinhood')"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <p class="mb-2"><strong>Drop CSV here</strong></p>
+                    <p class="text-muted small mb-3">or click to browse</p>
+                    <button class="btn btn-upload btn-sm">
+                        <i class="fas fa-file-upload"></i> Upload CSV
+                    </button>
+                </div>
+                <input type="file" id="file-input-robinhood" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'robinhood')">
+            </div>
+
+            <!-- Schwab -->
+            <div class="broker-card no-data" data-broker="schwab" id="broker-schwab">
+                <div class="text-center">
+                    <i class="fas fa-landmark broker-icon"></i>
+                    <div class="broker-name">Charles Schwab</div>
+                </div>
+                <div class="upload-zone" 
+                     id="upload-zone-schwab"
+                     onclick="triggerUpload('schwab')"
+                     ondrop="handleDrop(event, 'schwab')"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <p class="mb-2"><strong>Drop CSV here</strong></p>
+                    <p class="text-muted small mb-3">or click to browse</p>
+                    <button class="btn btn-upload btn-sm">
+                        <i class="fas fa-file-upload"></i> Upload CSV
+                    </button>
+                </div>
+                <input type="file" id="file-input-schwab" accept=".csv" style="display: none;" onchange="handleFileSelect(event, 'schwab')">
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script>
+        function triggerUpload(brokerName) {
+            document.getElementById(`file-input-${brokerName}`).click();
+        }
+
+        function handleFileSelect(event, brokerName) {
+            const file = event.target.files[0];
+            if (file) {
+                uploadFile(file, brokerName);
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('dragover');
+        }
+
+        function handleDragLeave(event) {
+            event.currentTarget.classList.remove('dragover');
+        }
+
+        function handleDrop(event, brokerName) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('dragover');
+            
+            const file = event.dataTransfer.files[0];
+            if (file && file.name.endsWith('.csv')) {
+                uploadFile(file, brokerName);
+            } else {
+                showToast('Invalid File', 'Please drop a CSV file', 'warning');
+            }
+        }
+
+        async function uploadFile(file, brokerName) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('broker', brokerName);
+
+            const card = document.getElementById(`broker-${brokerName}`);
+            const originalContent = card.innerHTML;
+            card.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Uploading and processing CSV...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(
+                        'Upload Successful', 
+                        `Successfully uploaded ${data.data.total_positions} positions!`, 
+                        'success'
+                    );
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast(
+                        'Upload Failed', 
+                        data.message || 'An error occurred while processing your file', 
+                        'error'
+                    );
+                    card.innerHTML = originalContent;
+                }
+            } catch (error) {
+                showToast(
+                    'Network Error', 
+                    `Could not connect to server: ${error.message}`, 
+                    'error'
+                );
+                card.innerHTML = originalContent;
+            }
+        }
+
+        function showToast(title, message, type = 'info', duration = 6000) {
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                warning: 'fa-exclamation-triangle',
+                info: 'fa-info-circle'
+            };
+
+            const toastId = `toast-${Date.now()}`;
+            const toastHtml = `
+                <div class="custom-toast toast-${type}" id="${toastId}">
+                    <div class="toast-header-custom">
+                        <div class="toast-icon">
+                            <i class="fas ${icons[type]}"></i>
+                        </div>
+                        <div class="toast-content">
+                            <p class="toast-title">${title}</p>
+                            <p class="toast-message">${message}</p>
+                        </div>
+                        <button class="toast-close" onclick="closeToast('${toastId}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="toast-progress">
+                        <div class="toast-progress-bar" style="width: 100%"></div>
+                    </div>
+                </div>
+            `;
+
+            const container = document.getElementById('toastContainer');
+            container.insertAdjacentHTML('beforeend', toastHtml);
+
+            const toast = document.getElementById(toastId);
+            const progressBar = toast.querySelector('.toast-progress-bar');
+            let width = 100;
+            const interval = 50;
+            const decrement = (interval / duration) * 100;
+
+            const timer = setInterval(() => {
+                width -= decrement;
+                if (width <= 0) {
+                    clearInterval(timer);
+                    closeToast(toastId);
+                } else {
+                    progressBar.style.width = width + '%';
+                }
+            }, interval);
+
+            toast.dataset.timerId = timer;
+        }
+
+        function closeToast(toastId) {
+            const toast = document.getElementById(toastId);
+            if (toast) {
+                if (toast.dataset.timerId) {
+                    clearInterval(parseInt(toast.dataset.timerId));
+                }
+                
+                toast.classList.add('hiding');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }
+        }
+
+        setTimeout(() => {
+            showToast('Welcome!', 'Upload a CSV file from any broker to get started', 'info', 4000);
+        }, 500);
+    </script>
+</body>
+</html>
