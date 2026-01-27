@@ -511,67 +511,168 @@
             background: var(--bg-secondary);
         }
 
+        .holdings-table tbody tr.holding-row.expandable {
+            cursor: pointer;
+        }
+
         .holdings-table td {
             padding: 1rem;
             color: var(--text-primary);
+            vertical-align: middle;
         }
 
-        .symbol-info {
+        .symbol-cell {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            margin-bottom: 0.25rem;
+        }
+
+        .expand-icon {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            transition: transform 0.3s;
+            width: 12px;
+        }
+
+        .expand-icon.rotated {
+            transform: rotate(90deg);
         }
 
         .symbol-text {
-            font-weight: 600;
             font-size: 1.1rem;
-        }
-
-        .badge {
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.7rem;
             font-weight: 600;
-            text-transform: uppercase;
+            color: var(--text-primary);
         }
 
-        .badge-etf {
-            background: rgba(159, 122, 234, 0.2);
-            color: #9f7aea;
-        }
-
-        .badge-mf {
-            background: rgba(66, 153, 225, 0.2);
-            color: #4299e1;
+        .badge-fund {
+            background: rgba(102, 126, 234, 0.15);
+            color: var(--gradient-start);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 600;
         }
 
         .holding-name {
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
         }
 
-        .value-cell {
-            font-weight: 600;
+        .quantity-value, .value-amount {
+            font-weight: 500;
         }
 
         .allocation-display {
             display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
+            align-items: center;
+            gap: 1rem;
         }
 
-        .allocation-bar {
+        .allocation-bar-bg {
+            flex: 1;
             height: 8px;
             background: var(--bg-secondary);
             border-radius: 4px;
             overflow: hidden;
         }
 
-        .allocation-fill {
+        .allocation-bar-fill {
             height: 100%;
             background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
             transition: width 0.3s;
+        }
+
+        .allocation-percent {
+            font-weight: 600;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        /* Broker breakdown row */
+        .broker-breakdown-row {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .breakdown-content {
+            padding: 1rem 2rem 1rem 3rem;
+        }
+
+        .broker-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .broker-line {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .broker-line i {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .broker-name {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .broker-qty {
+            color: var(--text-secondary);
+        }
+
+        .broker-value {
+            color: var(--text-secondary);
+            margin-left: auto;
+        }
+
+        .underlying-section {
+            border-top: 1px solid var(--border-color);
+            padding-top: 1rem;
+        }
+
+        .underlying-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .underlying-header i {
+            color: var(--gradient-start);
+        }
+
+        .btn-expand-underlying {
+            margin-left: auto;
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-expand-underlying:hover {
+            border-color: var(--gradient-start);
+            color: var(--gradient-start);
+        }
+
+        .underlying-status {
+            margin-top: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
         }
 
         .no-holdings {
@@ -721,8 +822,7 @@
             </div>
             {% endfor %}
         </div>
-
-        <!-- Holdings Section -->
+       <!-- Holdings Section -->
         <div class="holdings-section mt-5">
             <div class="holdings-header">
                 <h2>
@@ -745,49 +845,99 @@
                 <table class="holdings-table">
                     <thead>
                         <tr>
-                            <th>Symbol</th>
-                            <th>Quantity</th>
-                            <th>Price</th>
-                            <th>Value</th>
-                            <th>Allocation</th>
+                            <th style="width: 20%;">Symbol</th>
+                            <th style="width: 30%;">Name</th>
+                            <th style="width: 15%;">Quantity</th>
+                            <th style="width: 15%;">Value</th>
+                            <th style="width: 20%;">Allocation</th>
                         </tr>
                     </thead>
                     <tbody id="holdingsTableBody">
                         {% for holding in holdings %}
-                        <tr class="holding-row" 
+                        <!-- Main holding row -->
+                        <tr class="holding-row {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}expandable{% endif %}" 
                             data-symbol="{{ holding.symbol }}"
-                            data-asset-type="{{ holding.asset_type }}">
+                            data-asset-type="{{ holding.asset_type }}"
+                            {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}onclick="toggleHoldingRow('{{ holding.symbol }}')"{% endif %}>
                             
                             <td>
-                                <div class="symbol-info">
-                                    <span class="symbol-text">{{ holding.symbol }}</span>
-                                    {% if holding.asset_type == 'etf' %}
-                                    <span class="badge badge-etf">ETF</span>
-                                    {% elif holding.asset_type == 'mutual_fund' %}
-                                    <span class="badge badge-mf">MF</span>
+                                <div class="symbol-cell">
+                                    {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}
+                                    <i class="fas fa-chevron-right expand-icon" id="icon-{{ holding.symbol }}"></i>
                                     {% endif %}
-                                    {% if holding.has_overlap %}
-                                    <i class="fas fa-exclamation-triangle text-warning" title="Overlap detected"></i>
+                                    <strong class="symbol-text">{{ holding.symbol }}</strong>
+                                    {% if holding.is_etf_or_mf %}
+                                    <span class="badge badge-fund">{{ holding.asset_type|upper }}</span>
                                     {% endif %}
                                 </div>
-                                <div class="holding-name">{{ holding.name }}</div>
                             </td>
                             
-                            <td>{{ "{:,.2f}".format(holding.total_quantity) }}</td>
+                            <td>
+                                <span class="holding-name">{{ holding.name }}</span>
+                            </td>
                             
-                            <td>${{ "{:,.2f}".format(holding.average_price) }}</td>
+                            <td>
+                                <span class="quantity-value">{{ "{:,.2f}".format(holding.total_quantity|float) }}</span>
+                            </td>
                             
-                            <td class="value-cell">${{ "{:,.2f}".format(holding.total_value) }}</td>
+                            <td>
+                                <span class="value-amount">${{ "{:,.2f}".format(holding.total_value|float) }}</span>
+                            </td>
                             
                             <td>
                                 <div class="allocation-display">
-                                    <span>{{ "{:.2f}".format(holding.allocation_pct * 100) }}%</span>
-                                    <div class="allocation-bar">
-                                        <div class="allocation-fill" style="width: {{ holding.allocation_pct * 100 }}%"></div>
+                                    <div class="allocation-bar-bg">
+                                        <div class="allocation-bar-fill" style="width: {{ (holding.allocation_pct|float * 100)|round(1) }}%"></div>
                                     </div>
+                                    <span class="allocation-percent">{{ "{:.1f}".format(holding.allocation_pct|float * 100) }}%</span>
                                 </div>
                             </td>
                         </tr>
+                        
+                        <!-- Expandable broker breakdown row -->
+                        {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}
+                        <tr class="broker-breakdown-row" id="breakdown-{{ holding.symbol }}" style="display: none;">
+                            <td colspan="5">
+                                <div class="breakdown-content">
+                                    
+                                    <!-- Broker breakdown (if multiple brokers) -->
+                                    {% if holding.brokers|length > 1 %}
+                                    <div class="broker-details">
+                                        {% for broker in holding.brokers %}
+                                        <div class="broker-line">
+                                            <i class="fas fa-level-up-alt fa-rotate-90"></i>
+                                            <span class="broker-name">{{ broker.broker_display }}:</span>
+                                            <span class="broker-qty">{{ "{:,.2f}".format(broker.quantity|float) }} shares</span>
+                                            <span class="broker-value">({{ "$%.2f"|format(broker.value|float) }})</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <!-- ETF/MF underlying holdings -->
+                                    {% if holding.is_etf_or_mf %}
+                                    <div class="underlying-section">
+                                        <div class="underlying-header">
+                                            <i class="fas fa-layer-group"></i>
+                                            <span>Underlying Holdings ({{ holding.underlying_count or 0 }})</span>
+                                            {% if holding.underlying_count > 0 %}
+                                            <button class="btn-expand-underlying" onclick="event.stopPropagation(); viewUnderlying('{{ holding.symbol }}')">
+                                                View All <i class="fas fa-arrow-right"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                        {% if holding.underlying_count == 0 %}
+                                        <div class="underlying-status">
+                                            <em>Underlying holdings not yet resolved</em>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
                         {% endfor %}
                     </tbody>
                 </table>
@@ -799,8 +949,8 @@
                 </div>
                 {% endif %}
             </div>
-        </div>        
-
+        </div>
+        <!-- End Holdings Section -->
 
     </div>
 
@@ -970,6 +1120,20 @@
             createChart('{{ broker.name }}', {{ broker.total_value }});
             {% endif %}{% endfor %}
         }
+
+        function toggleHoldingRow(symbol) {
+            const breakdownRow = document.getElementById(`breakdown-${symbol}`);
+            const icon = document.getElementById(`icon-${symbol}`);
+            
+            if (breakdownRow.style.display === 'none') {
+                breakdownRow.style.display = 'table-row';
+                if (icon) icon.classList.add('rotated');
+            } else {
+                breakdownRow.style.display = 'none';
+                if (icon) icon.classList.remove('rotated');
+            }
+        }
+
         function filterHoldings() {
             const assetType = document.getElementById('assetTypeFilter').value;
             const searchText = document.getElementById('searchInput').value.toLowerCase();
@@ -982,8 +1146,24 @@
                 const matchesType = assetType === 'all' || type === assetType;
                 const matchesSearch = symbol.includes(searchText);
                 
-                row.style.display = (matchesType && matchesSearch) ? '' : 'none';
+                if (matchesType && matchesSearch) {
+                    row.style.display = '';
+                    // Keep breakdown hidden unless manually expanded
+                    const breakdown = document.getElementById(`breakdown-${row.dataset.symbol}`);
+                    if (breakdown && !document.getElementById(`icon-${row.dataset.symbol}`)?.classList.contains('rotated')) {
+                        breakdown.style.display = 'none';
+                    }
+                } else {
+                    row.style.display = 'none';
+                    const breakdown = document.getElementById(`breakdown-${row.dataset.symbol}`);
+                    if (breakdown) breakdown.style.display = 'none';
+                }
             });
+        }
+
+        function viewUnderlying(symbol) {
+            // TODO: Open modal showing all underlying holdings
+            alert(`View detailed underlying holdings for ${symbol} - Modal to be implemented`);
         }
 
     </script>

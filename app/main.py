@@ -103,36 +103,57 @@ def register_routes(app):
         try:
             print("\n=== DASHBOARD ROUTE CALLED ===", file=sys.stderr)
             
+            # Define all supported brokers
+            ALL_BROKERS = ['merrill', 'fidelity', 'webull', 'robinhood', 'schwab']
+            
             with db_session() as session:
-                # Get all active broker accounts
-                brokers = session.query(BrokerAccount).filter(BrokerAccount.is_active == True).all()
-                print(f"Found {len(brokers)} brokers", file=sys.stderr)
+                # Get all broker accounts from DB
+                db_brokers = session.query(BrokerAccount).all()
+                
+                # Create a map of broker_name -> BrokerAccount
+                broker_map = {b.broker_name: b for b in db_brokers}
                 
                 brokers_data = []
                 total_net_worth = 0
                 
-                for broker in brokers:
-                    # Get latest snapshot for this broker
-                    latest_snapshot = session.query(PortfolioSnapshot)\
-                        .filter(PortfolioSnapshot.broker_account_id == broker.id)\
-                        .order_by(PortfolioSnapshot.snapshot_date.desc())\
-                        .first()
+                # Show all brokers, whether they have data or not
+                for broker_name in ALL_BROKERS:
+                    broker = broker_map.get(broker_name)
                     
-                    if latest_snapshot:
-                        total_net_worth += float(latest_snapshot.total_value)
-                        brokers_data.append({
-                            'name': broker.broker_name,
-                            'display_name': broker.broker_name.replace('_', ' ').title(),
-                            'account_last4': broker.account_number_last4,
-                            'has_data': True,
-                            'total_value': float(latest_snapshot.total_value),
-                            'total_positions': latest_snapshot.total_positions,
-                            'last_updated': latest_snapshot.snapshot_date.strftime('%b %d, %Y')
-                        })
+                    if broker:
+                        # Get latest snapshot for this broker
+                        latest_snapshot = session.query(PortfolioSnapshot)\
+                            .filter(PortfolioSnapshot.broker_account_id == broker.id)\
+                            .order_by(PortfolioSnapshot.snapshot_date.desc())\
+                            .first()
+                        
+                        if latest_snapshot:
+                            total_net_worth += float(latest_snapshot.total_value)
+                            brokers_data.append({
+                                'name': broker_name,
+                                'display_name': broker_name.replace('_', ' ').title(),
+                                'account_last4': broker.account_number_last4,
+                                'has_data': True,
+                                'total_value': float(latest_snapshot.total_value),
+                                'total_positions': latest_snapshot.total_positions,
+                                'last_updated': latest_snapshot.snapshot_date.strftime('%b %d, %Y')
+                            })
+                        else:
+                            # Broker exists but no snapshots
+                            brokers_data.append({
+                                'name': broker_name,
+                                'display_name': broker_name.replace('_', ' ').title(),
+                                'account_last4': broker.account_number_last4,
+                                'has_data': False,
+                                'total_value': 0,
+                                'total_positions': 0,
+                                'last_updated': None
+                            })
                     else:
+                        # Broker doesn't exist in DB yet
                         brokers_data.append({
-                            'name': broker.broker_name,
-                            'display_name': broker.broker_name.replace('_', ' ').title(),
+                            'name': broker_name,
+                            'display_name': broker_name.replace('_', ' ').title(),
                             'account_last4': None,
                             'has_data': False,
                             'total_value': 0,
@@ -147,11 +168,6 @@ def register_routes(app):
             holdings_data = get_current_holdings()
             holdings = holdings_data.get('holdings', [])
             print(f"Got {len(holdings)} holdings", file=sys.stderr)
-            
-            # Debug: print first holding structure if exists
-            if holdings:
-                print(f"First holding keys: {list(holdings[0].keys())}", file=sys.stderr)
-                print(f"First holding sample: symbol={holdings[0].get('symbol')}, value={holdings[0].get('total_value')}", file=sys.stderr)
             
             print("Rendering template...", file=sys.stderr)
             result = render_template('dashboard.html',
@@ -168,8 +184,8 @@ def register_routes(app):
             print(str(e), file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
             print("="*80 + "\n", file=sys.stderr)
-            raise  # Re-raise so error handler catches it
-        
+            raise
+
     @app.route('/health')
     def health():
         """Health check endpoint for Docker"""
