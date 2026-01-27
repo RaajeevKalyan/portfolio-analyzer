@@ -431,6 +431,167 @@
             background-color: var(--bg-secondary);
             color: var(--text-primary);
         }
+
+        /* Holdings Section */
+        .holdings-section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            margin-bottom: 3rem;
+        }
+
+        .holdings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .holdings-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .holdings-filters {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .filter-select, .filter-search {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .filter-select:focus, .filter-search:focus {
+            outline: none;
+            border-color: var(--gradient-start);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .filter-search {
+            min-width: 200px;
+        }
+
+        .holdings-table-container {
+            overflow-x: auto;
+        }
+
+        .holdings-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .holdings-table thead th {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .holdings-table tbody tr.holding-row {
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s;
+        }
+
+        .holdings-table tbody tr.holding-row:hover {
+            background: var(--bg-secondary);
+        }
+
+        .holdings-table td {
+            padding: 1rem;
+            color: var(--text-primary);
+        }
+
+        .symbol-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .symbol-text {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-etf {
+            background: rgba(159, 122, 234, 0.2);
+            color: #9f7aea;
+        }
+
+        .badge-mf {
+            background: rgba(66, 153, 225, 0.2);
+            color: #4299e1;
+        }
+
+        .holding-name {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .value-cell {
+            font-weight: 600;
+        }
+
+        .allocation-display {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .allocation-bar {
+            height: 8px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .allocation-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+            transition: width 0.3s;
+        }
+
+        .no-holdings {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .no-holdings i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .no-holdings p {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
     </style>
 </head>
 <body>
@@ -560,6 +721,87 @@
             </div>
             {% endfor %}
         </div>
+
+        <!-- Holdings Section -->
+        <div class="holdings-section mt-5">
+            <div class="holdings-header">
+                <h2>
+                    <i class="fas fa-layer-group"></i>
+                    Portfolio Holdings
+                </h2>
+                <div class="holdings-filters">
+                    <select class="filter-select" id="assetTypeFilter" onchange="filterHoldings()">
+                        <option value="all">All Assets</option>
+                        <option value="stock">Stocks Only</option>
+                        <option value="etf">ETFs Only</option>
+                        <option value="mutual_fund">Mutual Funds Only</option>
+                    </select>
+                    <input type="text" class="filter-search" id="searchInput" placeholder="Search symbol..." onkeyup="filterHoldings()">
+                </div>
+            </div>
+
+            <div class="holdings-table-container">
+                {% if holdings and holdings|length > 0 %}
+                <table class="holdings-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                            <th>Value</th>
+                            <th>Allocation</th>
+                        </tr>
+                    </thead>
+                    <tbody id="holdingsTableBody">
+                        {% for holding in holdings %}
+                        <tr class="holding-row" 
+                            data-symbol="{{ holding.symbol }}"
+                            data-asset-type="{{ holding.asset_type }}">
+                            
+                            <td>
+                                <div class="symbol-info">
+                                    <span class="symbol-text">{{ holding.symbol }}</span>
+                                    {% if holding.asset_type == 'etf' %}
+                                    <span class="badge badge-etf">ETF</span>
+                                    {% elif holding.asset_type == 'mutual_fund' %}
+                                    <span class="badge badge-mf">MF</span>
+                                    {% endif %}
+                                    {% if holding.has_overlap %}
+                                    <i class="fas fa-exclamation-triangle text-warning" title="Overlap detected"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="holding-name">{{ holding.name }}</div>
+                            </td>
+                            
+                            <td>{{ "{:,.2f}".format(holding.total_quantity) }}</td>
+                            
+                            <td>${{ "{:,.2f}".format(holding.average_price) }}</td>
+                            
+                            <td class="value-cell">${{ "{:,.2f}".format(holding.total_value) }}</td>
+                            
+                            <td>
+                                <div class="allocation-display">
+                                    <span>{{ "{:.2f}".format(holding.allocation_pct * 100) }}%</span>
+                                    <div class="allocation-bar">
+                                        <div class="allocation-fill" style="width: {{ holding.allocation_pct * 100 }}%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-holdings">
+                    <i class="fas fa-inbox"></i>
+                    <p>No holdings found</p>
+                    <small>Upload a CSV file from your brokers to get started</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>        
+
+
     </div>
 
     <div class="toast-container" id="toastContainer"></div>
@@ -728,6 +970,22 @@
             createChart('{{ broker.name }}', {{ broker.total_value }});
             {% endif %}{% endfor %}
         }
+        function filterHoldings() {
+            const assetType = document.getElementById('assetTypeFilter').value;
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('.holding-row');
+            
+            rows.forEach(row => {
+                const symbol = row.dataset.symbol.toLowerCase();
+                const type = row.dataset.assetType;
+                
+                const matchesType = assetType === 'all' || type === assetType;
+                const matchesSearch = symbol.includes(searchText);
+                
+                row.style.display = (matchesType && matchesSearch) ? '' : 'none';
+            });
+        }
+
     </script>
 </body>
 </html>

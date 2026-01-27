@@ -6,6 +6,11 @@ from app.config import get_config
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+from app.services.holdings_aggregator import get_current_holdings
+from app.database import db_session
+from app.models import BrokerAccount, PortfolioSnapshot
+import traceback
+import sys
 
 
 def create_app():
@@ -15,13 +20,39 @@ def create_app():
     # Load configuration
     config = get_config()
     app.config.from_object(config)
-    
+
+
     # Validate configuration
     config.validate()
-    
+
+
     # Setup logging
     setup_logging(app)
+
+    # Config settings
+    app.config['DEBUG'] = True
+    app.config['PROPAGATE_EXCEPTIONS'] = True
     
+    # Error handler - goes HERE, after config, before routes
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        """Catch all exceptions and print full traceback"""
+        print("\n" + "="*80, file=sys.stderr)
+        print("EXCEPTION CAUGHT:", file=sys.stderr)
+        print("="*80, file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        print("="*80 + "\n", file=sys.stderr)
+        
+        return f"""
+        <html>
+        <head><title>Error</title></head>
+        <body>
+            <h1>Internal Server Error</h1>
+            <pre>{traceback.format_exc()}</pre>
+        </body>
+        </html>
+        """, 500
+
     # *** ADD THIS - Initialize database ***
     from app.database import init_db
     with app.app_context():
@@ -67,85 +98,77 @@ def register_routes(app):
     app.register_blueprint(holdings_bp)
     
     @app.route('/')
-    def index():
-        """Dashboard page"""
-        from app.database import db_session
-        from app.models import BrokerAccount, PortfolioSnapshot
-        from sqlalchemy import desc
-        import logging
-        
-        logger = logging.getLogger(__name__)
-        
+    def dashboard():
+        """Dashboard showing all broker accounts and aggregated holdings"""
         try:
-            # Use db_session context manager (auto-commits)
+            print("\n=== DASHBOARD ROUTE CALLED ===", file=sys.stderr)
+            
             with db_session() as session:
-                # Get all broker accounts with their latest snapshot
-                brokers_data = []
-                supported_brokers = ['merrill', 'fidelity', 'webull', 'robinhood', 'schwab']
+                # Get all active broker accounts
+                brokers = session.query(BrokerAccount).filter(BrokerAccount.is_active == True).all()
+                print(f"Found {len(brokers)} brokers", file=sys.stderr)
                 
-                for broker_name in supported_brokers:
-                    # Query by broker_name only (not account_number_last4)
-                    broker_account = session.query(BrokerAccount).filter_by(
-                        broker_name=broker_name,
-                        is_active=True
-                    ).first()
+                brokers_data = []
+                total_net_worth = 0
+                
+                for broker in brokers:
+                    # Get latest snapshot for this broker
+                    latest_snapshot = session.query(PortfolioSnapshot)\
+                        .filter(PortfolioSnapshot.broker_account_id == broker.id)\
+                        .order_by(PortfolioSnapshot.snapshot_date.desc())\
+                        .first()
                     
-                    if broker_account:
-                        # Get latest snapshot
-                        latest_snapshot = session.query(PortfolioSnapshot).filter_by(
-                            broker_account_id=broker_account.id
-                        ).order_by(desc(PortfolioSnapshot.snapshot_date)).first()
-                        
-                        if latest_snapshot:
-                            brokers_data.append({
-                                'name': broker_name,
-                                'display_name': broker_name.replace('_', ' ').title(),
-                                'has_data': True,
-                                'total_value': float(latest_snapshot.total_value),
-                                'total_positions': latest_snapshot.total_positions,
-                                'last_updated': latest_snapshot.snapshot_date.strftime('%b %d, %Y %I:%M %p'),
-                                'account_last4': broker_account.account_number_last4
-                            })
-                        else:
-                            # Account exists but no snapshots
-                            brokers_data.append({
-                                'name': broker_name,
-                                'display_name': broker_name.replace('_', ' ').title(),
-                                'has_data': False,
-                                'total_value': 0,
-                                'total_positions': 0,
-                                'last_updated': None,
-                                'account_last4': broker_account.account_number_last4
-                            })
-                    else:
-                        # No account for this broker yet
+                    if latest_snapshot:
+                        total_net_worth += float(latest_snapshot.total_value)
                         brokers_data.append({
-                            'name': broker_name,
-                            'display_name': broker_name.replace('_', ' ').title(),
+                            'name': broker.broker_name,
+                            'display_name': broker.broker_name.replace('_', ' ').title(),
+                            'account_last4': broker.account_number_last4,
+                            'has_data': True,
+                            'total_value': float(latest_snapshot.total_value),
+                            'total_positions': latest_snapshot.total_positions,
+                            'last_updated': latest_snapshot.snapshot_date.strftime('%b %d, %Y')
+                        })
+                    else:
+                        brokers_data.append({
+                            'name': broker.broker_name,
+                            'display_name': broker.broker_name.replace('_', ' ').title(),
+                            'account_last4': None,
                             'has_data': False,
                             'total_value': 0,
                             'total_positions': 0,
-                            'last_updated': None,
-                            'account_last4': None
+                            'last_updated': None
                         })
-                
-                # Calculate total net worth
-                total_net_worth = sum(b['total_value'] for b in brokers_data if b['has_data'])
             
-            return render_template('dashboard.html', 
-                                brokers=brokers_data,
-                                total_net_worth=total_net_worth)
+            print(f"Total net worth: ${total_net_worth}", file=sys.stderr)
+            
+            # Get aggregated holdings
+            print("Getting holdings...", file=sys.stderr)
+            holdings_data = get_current_holdings()
+            holdings = holdings_data.get('holdings', [])
+            print(f"Got {len(holdings)} holdings", file=sys.stderr)
+            
+            # Debug: print first holding structure if exists
+            if holdings:
+                print(f"First holding keys: {list(holdings[0].keys())}", file=sys.stderr)
+                print(f"First holding sample: symbol={holdings[0].get('symbol')}, value={holdings[0].get('total_value')}", file=sys.stderr)
+            
+            print("Rendering template...", file=sys.stderr)
+            result = render_template('dashboard.html',
+                                    brokers=brokers_data,
+                                    total_net_worth=total_net_worth,
+                                    holdings=holdings)
+            print("Template rendered successfully!", file=sys.stderr)
+            return result
                                 
         except Exception as e:
-            logger.error(f"Error loading dashboard data: {e}", exc_info=True)
-            # Return empty dashboard on error
-            return render_template('dashboard.html', 
-                                brokers=[
-                                    {'name': b, 'display_name': b.replace('_', ' ').title(), 'has_data': False, 
-                                    'total_value': 0, 'total_positions': 0, 'last_updated': None, 'account_last4': None}
-                                    for b in ['merrill', 'fidelity', 'webull', 'robinhood', 'schwab']
-                                ],
-                                total_net_worth=0)
+            print("\n" + "="*80, file=sys.stderr)
+            print("ERROR IN DASHBOARD ROUTE:", file=sys.stderr)
+            print("="*80, file=sys.stderr)
+            print(str(e), file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            print("="*80 + "\n", file=sys.stderr)
+            raise  # Re-raise so error handler catches it
         
     @app.route('/health')
     def health():
