@@ -693,6 +693,286 @@
             margin-bottom: 0.5rem;
         }
 
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 2rem;
+        }
+
+        .modal-container {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-title {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .modal-title i {
+            color: var(--gradient-start);
+            margin-right: 0.5rem;
+        }
+
+        .modal-title span:first-child {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-left: 2rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .modal-summary {
+            display: flex;
+            gap: 2rem;
+            padding: 1.5rem 2rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .summary-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .summary-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 500;
+        }
+
+        .summary-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-filters {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            align-items: center;
+        }
+
+        .modal-search {
+            flex: 1;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .modal-search:focus {
+            outline: none;
+            border-color: var(--gradient-start);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .modal-filter-right {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem 2rem;
+        }
+
+        .underlying-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .underlying-table thead th {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 2px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .underlying-table tbody tr {
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s;
+        }
+
+        .underlying-table tbody tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        .underlying-table tbody tr.has-overlap {
+            background: rgba(239, 68, 68, 0.05);
+        }
+
+        .underlying-table td {
+            padding: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .underlying-symbol {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .underlying-name {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .weight-value {
+            font-weight: 500;
+        }
+
+        .overlap-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .overlap-badge i {
+            font-size: 0.9rem;
+        }
+
+        .underlying-empty {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .underlying-empty i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .underlying-empty p {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .modal-footer {
+            padding: 1rem 2rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--gradient-start);
+            color: var(--gradient-start);
+        }
+
+        /* Scrollbar styling for modal */
+        .modal-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }        
+
     </style>
 </head>
 <body>
@@ -1163,9 +1443,204 @@
 
         function viewUnderlying(symbol) {
             // TODO: Open modal showing all underlying holdings
-            alert(`View detailed underlying holdings for ${symbol} - Modal to be implemented`);
+            //alert(`View detailed underlying holdings for ${symbol} - Modal to be implemented`);
         }
 
     </script>
+    <script>
+    // Store underlying holdings data
+    let currentUnderlyingData = [];
+    let directHoldingsSet = new Set(); // Symbols held directly in portfolio
+
+    async function viewUnderlying(symbol) {
+        try {
+            // Fetch underlying holdings data for this symbol
+            const response = await fetch(`/api/holdings/underlying/${symbol}`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch underlying holdings');
+            }
+            
+            const data = await response.json();
+            
+            // Update modal header
+            document.getElementById('modalFundSymbol').textContent = data.symbol;
+            document.getElementById('modalFundName').textContent = data.name;
+            document.getElementById('modalTotalValue').textContent = `$${formatNumber(data.total_value)}`;
+            document.getElementById('modalQuantity').textContent = `${formatNumber(data.quantity)} shares @ $${formatNumber(data.price)}`;
+            document.getElementById('modalUnderlyingCount').textContent = `${data.underlying_holdings.length} stocks`;
+            
+            // Store data globally
+            currentUnderlyingData = data.underlying_holdings;
+            directHoldingsSet = new Set(data.direct_holdings || []);
+            
+            // Populate table
+            renderUnderlyingTable(currentUnderlyingData);
+            
+            // Show modal
+            document.getElementById('underlyingModal').style.display = 'flex';
+            
+            // Reset filters
+            document.getElementById('underlyingSearch').value = '';
+            document.getElementById('overlapOnlyCheckbox').checked = false;
+            
+        } catch (error) {
+            console.error('Error loading underlying holdings:', error);
+            alert('Failed to load underlying holdings. Please try again.');
+        }
+    }
+
+    function renderUnderlyingTable(holdings) {
+        const tbody = document.getElementById('underlyingTableBody');
+        const emptyDiv = document.getElementById('underlyingEmpty');
+        
+        if (holdings.length === 0) {
+            tbody.innerHTML = '';
+            emptyDiv.style.display = 'block';
+            return;
+        }
+        
+        emptyDiv.style.display = 'none';
+        
+        tbody.innerHTML = holdings.map(holding => {
+            const hasOverlap = directHoldingsSet.has(holding.symbol);
+            const rowClass = hasOverlap ? 'has-overlap' : '';
+            
+            return `
+                <tr class="${rowClass}" data-symbol="${holding.symbol}" data-name="${holding.name.toLowerCase()}">
+                    <td>
+                        <span class="underlying-symbol">${holding.symbol}</span>
+                    </td>
+                    <td>
+                        <span class="underlying-name">${holding.name}</span>
+                    </td>
+                    <td>
+                        <span class="weight-value">${formatPercent(holding.weight)}</span>
+                    </td>
+                    <td>
+                        $${formatNumber(holding.value)}
+                    </td>
+                    <td>
+                        ${hasOverlap ? '<span class="overlap-badge"><i class="fas fa-exclamation-triangle"></i> Also held</span>' : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function filterUnderlyingHoldings() {
+        const searchText = document.getElementById('underlyingSearch').value.toLowerCase();
+        const overlapOnly = document.getElementById('overlapOnlyCheckbox').checked;
+        
+        let filtered = currentUnderlyingData;
+        
+        // Filter by search text
+        if (searchText) {
+            filtered = filtered.filter(h => 
+                h.symbol.toLowerCase().includes(searchText) || 
+                h.name.toLowerCase().includes(searchText)
+            );
+        }
+        
+        // Filter by overlap
+        if (overlapOnly) {
+            filtered = filtered.filter(h => directHoldingsSet.has(h.symbol));
+        }
+        
+        renderUnderlyingTable(filtered);
+    }
+
+    function closeUnderlyingModal(event) {
+        if (event && event.target !== event.currentTarget) {
+            return; // Don't close if clicking inside modal
+        }
+        document.getElementById('underlyingModal').style.display = 'none';
+    }
+
+    function formatNumber(num) {
+        return Number(num).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function formatPercent(num) {
+        return (Number(num) * 100).toFixed(2) + '%';
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('underlyingModal').style.display === 'flex') {
+            closeUnderlyingModal();
+        }
+    });
+    </script>    
+
+    <!-- Underlying Holdings Modal -->
+    <div class="modal-overlay" id="underlyingModal" style="display: none;" onclick="closeUnderlyingModal(event)">
+        <div class="modal-container" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-layer-group"></i>
+                    <span id="modalFundSymbol">VTI</span>
+                    <span class="modal-subtitle" id="modalFundName">Vanguard Total Stock Market ETF</span>
+                </div>
+                <button class="modal-close" onclick="closeUnderlyingModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-summary">
+                <div class="summary-item">
+                    <span class="summary-label">Total Value:</span>
+                    <span class="summary-value" id="modalTotalValue">$24,500.00</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Quantity:</span>
+                    <span class="summary-value" id="modalQuantity">100 shares @ $245.00</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Underlying Holdings:</span>
+                    <span class="summary-value" id="modalUnderlyingCount">500 stocks</span>
+                </div>
+            </div>
+            
+            <div class="modal-filters">
+                <input type="text" class="modal-search" id="underlyingSearch" placeholder="Search underlying symbol or name..." onkeyup="filterUnderlyingHoldings()">
+                <div class="modal-filter-right">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="overlapOnlyCheckbox" onchange="filterUnderlyingHoldings()">
+                        <span>Show overlaps only</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="modal-body">
+                <table class="underlying-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">Symbol</th>
+                            <th style="width: 35%;">Name</th>
+                            <th style="width: 15%;">Weight</th>
+                            <th style="width: 20%;">Est. Value</th>
+                            <th style="width: 15%;">Overlap</th>
+                        </tr>
+                    </thead>
+                    <tbody id="underlyingTableBody">
+                        <!-- Populated by JavaScript -->
+                    </tbody>
+                </table>
+                
+                <div id="underlyingEmpty" class="underlying-empty" style="display: none;">
+                    <i class="fas fa-search"></i>
+                    <p>No underlying holdings found</p>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeUnderlyingModal()">Close</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
