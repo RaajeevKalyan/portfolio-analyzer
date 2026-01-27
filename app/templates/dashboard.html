@@ -971,7 +971,241 @@
 
         .modal-body::-webkit-scrollbar-thumb:hover {
             background: var(--text-muted);
-        }        
+        }
+
+        /* Risk Analysis Section */
+        .risk-analysis-section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            margin-bottom: 3rem;
+        }
+
+        .risk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .risk-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .risk-header h2 i {
+            color: var(--gradient-start);
+            margin-right: 0.5rem;
+        }
+
+        .risk-level-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: var(--bg-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+
+        .risk-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .risk-value {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .risk-value.low {
+            color: #10b981;
+        }
+
+        .risk-value.medium {
+            color: #f59e0b;
+        }
+
+        .risk-value.high {
+            color: #ef4444;
+        }
+
+        .risk-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .risk-card {
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .risk-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .risk-card-header h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .risk-card-header h3 i {
+            color: var(--gradient-start);
+            font-size: 0.9rem;
+        }
+
+        .risk-tooltip {
+            color: var(--text-muted);
+            cursor: help;
+        }
+
+        .risk-card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .chart-container-risk {
+            position: relative;
+            height: 200px;
+        }
+
+        .risk-warnings {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .warning-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: var(--bg-card);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .warning-item i {
+            color: #ef4444;
+        }
+
+        .warning-item.no-warning {
+            color: var(--text-muted);
+        }
+
+        .warning-item.no-warning i {
+            color: #10b981;
+        }
+
+        .sector-legend, .geography-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .legend-item, .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: var(--bg-card);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            margin-right: 0.5rem;
+        }
+
+        .legend-label {
+            display: flex;
+            align-items: center;
+            color: var(--text-primary);
+        }
+
+        .legend-value, .stat-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .overlap-alert {
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .overlap-alert-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: #ef4444;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .overlap-alert-header i {
+            font-size: 1.2rem;
+        }
+
+        .overlap-alert-body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .overlap-item {
+            background: var(--bg-card);
+            padding: 1rem;
+            border-radius: 6px;
+            border-left: 3px solid #ef4444;
+        }
+
+        .overlap-funds {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .overlap-percentage {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .overlap-recommendation {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+
+        @media (max-width: 1024px) {
+            .risk-cards-grid {
+                grid-template-columns: 1fr;
+            }
+        }
 
     </style>
 </head>
@@ -1102,6 +1336,94 @@
             </div>
             {% endfor %}
         </div>
+
+        <!-- Risk Analysis Section -->
+        <div class="risk-analysis-section mt-5">
+            <div class="risk-header">
+                <h2>
+                    <i class="fas fa-shield-halved"></i>
+                    Risk Analysis
+                </h2>
+                <div class="risk-level-badge" id="overallRiskBadge">
+                    <span class="risk-label">Overall Risk:</span>
+                    <span class="risk-value">Medium</span>
+                </div>
+            </div>
+            
+            <div class="risk-cards-grid">
+                
+                <!-- Stock Concentration Card -->
+                <div class="risk-card">
+                    <div class="risk-card-header">
+                        <h3><i class="fas fa-chart-pie"></i> Stock Concentration</h3>
+                        <span class="risk-tooltip" title="Stocks exceeding 20% threshold">
+                            <i class="fas fa-info-circle"></i>
+                        </span>
+                    </div>
+                    <div class="risk-card-body">
+                        <div class="chart-container-risk">
+                            <canvas id="concentrationChart"></canvas>
+                        </div>
+                        <div class="risk-warnings" id="concentrationWarnings">
+                            <div class="warning-item">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span>No high concentration detected</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sector Allocation Card -->
+                <div class="risk-card">
+                    <div class="risk-card-header">
+                        <h3><i class="fas fa-chart-bar"></i> Sector Allocation</h3>
+                        <span class="risk-tooltip" title="Distribution across sectors">
+                            <i class="fas fa-info-circle"></i>
+                        </span>
+                    </div>
+                    <div class="risk-card-body">
+                        <div class="chart-container-risk">
+                            <canvas id="sectorChart"></canvas>
+                        </div>
+                        <div class="sector-legend" id="sectorLegend">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Geographic Exposure Card -->
+                <div class="risk-card">
+                    <div class="risk-card-header">
+                        <h3><i class="fas fa-globe"></i> Geographic Exposure</h3>
+                        <span class="risk-tooltip" title="Geographic distribution">
+                            <i class="fas fa-info-circle"></i>
+                        </span>
+                    </div>
+                    <div class="risk-card-body">
+                        <div class="chart-container-risk">
+                            <canvas id="geographyChart"></canvas>
+                        </div>
+                        <div class="geography-stats" id="geographyStats">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <!-- ETF/MF Overlap Warning (if detected) -->
+            <div class="overlap-alert" id="overlapAlert" style="display: none;">
+                <div class="overlap-alert-header">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>ETF/Mutual Fund Overlap Detected</strong>
+                </div>
+                <div class="overlap-alert-body" id="overlapAlertBody">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+        <!-- END Risk Analysis Section -->     
+        
        <!-- Holdings Section -->
         <div class="holdings-section mt-5">
             <div class="holdings-header">
@@ -1574,7 +1896,252 @@
             closeUnderlyingModal();
         }
     });
-    </script>    
+    </script>
+    <!-- Script block for risk -->
+    <script>
+    // Risk Analysis Charts
+    let concentrationChart = null;
+    let sectorChart = null;
+    let geographyChart = null;
+
+    function initializeRiskCharts() {
+        // Get holdings data (should already be available from main holdings table)
+        const holdings = {{ holdings|tojson|safe }};
+        
+        if (!holdings || holdings.length === 0) {
+            return;
+        }
+        
+        // Initialize charts
+        createConcentrationChart(holdings);
+        createSectorChart(holdings);
+        createGeographyChart(holdings);
+        updateOverallRisk(holdings);
+    }
+
+    function createConcentrationChart(holdings) {
+        const ctx = document.getElementById('concentrationChart');
+        if (!ctx) return;
+        
+        // Get top 5 holdings by allocation
+        const topHoldings = holdings
+            .slice()
+            .sort((a, b) => b.allocation_pct - a.allocation_pct)
+            .slice(0, 5);
+        
+        const labels = topHoldings.map(h => h.symbol);
+        const data = topHoldings.map(h => (h.allocation_pct * 100).toFixed(1));
+        const backgroundColors = topHoldings.map(h => 
+            h.allocation_pct > 0.20 ? '#ef4444' : '#667eea'
+        );
+        
+        if (concentrationChart) {
+            concentrationChart.destroy();
+        }
+        
+        concentrationChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: backgroundColors,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `${context.label}: ${context.parsed}%`
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Update warnings
+        const warningsDiv = document.getElementById('concentrationWarnings');
+        const highConcentration = topHoldings.filter(h => h.allocation_pct > 0.20);
+        
+        if (highConcentration.length > 0) {
+            warningsDiv.innerHTML = highConcentration.map(h => `
+                <div class="warning-item">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>${h.symbol}: ${(h.allocation_pct * 100).toFixed(1)}% (over 20% limit)</span>
+                </div>
+            `).join('');
+        } else {
+            warningsDiv.innerHTML = `
+                <div class="warning-item no-warning">
+                    <i class="fas fa-check-circle"></i>
+                    <span>No high concentration detected</span>
+                </div>
+            `;
+        }
+    }
+
+    function createSectorChart(holdings) {
+        const ctx = document.getElementById('sectorChart');
+        if (!ctx) return;
+        
+        // Mock sector data - in production, this should come from backend
+        const sectors = {
+            'Technology': 45,
+            'Finance': 18,
+            'Healthcare': 15,
+            'Consumer': 12,
+            'Other': 10
+        };
+        
+        const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b'];
+        
+        if (sectorChart) {
+            sectorChart.destroy();
+        }
+        
+        sectorChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(sectors),
+                datasets: [{
+                    data: Object.values(sectors),
+                    backgroundColor: colors,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'var(--border-color)'
+                        },
+                        ticks: {
+                            color: 'var(--text-secondary)',
+                            callback: (value) => value + '%'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: 'var(--text-primary)'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Update legend
+        const legendDiv = document.getElementById('sectorLegend');
+        legendDiv.innerHTML = Object.entries(sectors).map(([sector, pct], idx) => `
+            <div class="legend-item">
+                <div class="legend-label">
+                    <div class="legend-color" style="background: ${colors[idx]}"></div>
+                    ${sector}
+                </div>
+                <div class="legend-value">${pct}%</div>
+            </div>
+        `).join('');
+    }
+
+    function createGeographyChart(holdings) {
+        const ctx = document.getElementById('geographyChart');
+        if (!ctx) return;
+        
+        // Mock geography data - in production, this should come from backend
+        const geography = {
+            'US': 70,
+            'International Developed': 20,
+            'Emerging Markets': 10
+        };
+        
+        const colors = ['#667eea', '#764ba2', '#f093fb'];
+        
+        if (geographyChart) {
+            geographyChart.destroy();
+        }
+        
+        geographyChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(geography),
+                datasets: [{
+                    data: Object.values(geography),
+                    backgroundColor: colors,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+        
+        // Update stats
+        const statsDiv = document.getElementById('geographyStats');
+        statsDiv.innerHTML = Object.entries(geography).map(([region, pct], idx) => `
+            <div class="stat-item">
+                <div class="legend-label">
+                    <div class="legend-color" style="background: ${colors[idx]}"></div>
+                    ${region}
+                </div>
+                <div class="stat-value">${pct}%</div>
+            </div>
+        `).join('');
+    }
+
+    function updateOverallRisk(holdings) {
+        // Calculate overall risk level based on concentration
+        const maxConcentration = Math.max(...holdings.map(h => h.allocation_pct));
+        
+        let riskLevel = 'low';
+        let riskClass = 'low';
+        
+        if (maxConcentration > 0.30) {
+            riskLevel = 'High';
+            riskClass = 'high';
+        } else if (maxConcentration > 0.20) {
+            riskLevel = 'Medium';
+            riskClass = 'medium';
+        } else {
+            riskLevel = 'Low';
+            riskClass = 'low';
+        }
+        
+        const badge = document.getElementById('overallRiskBadge');
+        const valueSpan = badge.querySelector('.risk-value');
+        valueSpan.textContent = riskLevel;
+        valueSpan.className = `risk-value ${riskClass}`;
+    }
+
+    // Initialize charts when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof Chart !== 'undefined') {
+            setTimeout(initializeRiskCharts, 100);
+        }
+    });
+    </script>     
+    <!-- End Script block for risk -->
 
     <!-- Underlying Holdings Modal -->
     <div class="modal-overlay" id="underlyingModal" style="display: none;" onclick="closeUnderlyingModal(event)">
