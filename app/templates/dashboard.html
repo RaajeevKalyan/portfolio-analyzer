@@ -136,10 +136,27 @@
         
         .broker-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 2rem;
             margin-top: 2rem;
         }
+        @media (max-width: 1400px) {
+            .broker-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .broker-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .broker-grid {
+                grid-template-columns: 1fr;
+            }
+        }        
         
         .broker-card {
             background: var(--bg-card);
@@ -184,6 +201,8 @@
         .broker-icon-circle.webull { background: linear-gradient(135deg, #5B21B6, #4C1D95); }
         .broker-icon-circle.robinhood { background: linear-gradient(135deg, #00C805, #009604); }
         .broker-icon-circle.schwab { background: linear-gradient(135deg, #00A0DC, #0077A8); }
+        .broker-icon-circle.ally { background: linear-gradient(135deg, #6B2C91, #552370); }
+        .broker-icon-circle.etrade { background: linear-gradient(135deg, #6633CC, #4D2699); }
         
         .broker-name-section h3 {
             margin: 0;
@@ -1207,6 +1226,126 @@
             }
         }
 
+        /* Settings Button */
+        .settings-btn {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            color: var(--text-primary);
+        }
+
+        .settings-btn:hover {
+            transform: scale(1.05);
+            border-color: var(--gradient-start);
+            box-shadow: var(--shadow);
+        }
+
+        /* Settings Modal */
+        .settings-modal {
+            max-width: 600px;
+        }
+
+        .settings-section {
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .settings-section:last-child {
+            border-bottom: none;
+        }
+
+        .settings-section h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .settings-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .setting-item label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .setting-label {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .setting-current {
+            font-weight: 600;
+            color: var(--gradient-start);
+            font-size: 1.1rem;
+        }
+
+        .slider-container input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg-secondary);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .slider-container input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            cursor: pointer;
+            border: none;
+        }
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            border: none;
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }        
+
     </style>
 </head>
 <body>
@@ -1218,7 +1357,11 @@
                 </div>
                 <span>Portfolio Risk Analyzer</span>
             </a>
-            <div class="ms-auto">
+            <div class="ms-auto d-flex gap-2 align-items-center">
+                <!-- Settings Button -->
+                <button class="settings-btn" onclick="openRiskSettings()" title="Risk Analysis Settings">
+                    <i class="fas fa-sliders"></i>
+                </button>
                 <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle theme">
                     <i class="fas fa-sun theme-icon" id="themeIcon"></i>
                 </button>
@@ -1242,10 +1385,20 @@
                 <div class="broker-header">
                     <div class="broker-info">
                         <div class="broker-icon-circle {{ broker.name }}">
-                            <i class="fas {% if broker.name == 'merrill' %}fa-building-columns{% elif broker.name == 'fidelity' %}fa-chart-line{% elif broker.name == 'webull' %}fa-chart-simple{% elif broker.name == 'robinhood' %}fa-arrow-trend-up{% elif broker.name == 'schwab' %}fa-landmark{% endif %}"></i>
+                            <i class="fas {% if broker.name == 'merrill' %}fa-building-columns
+                            {% elif broker.name == 'fidelity' %}fa-chart-line
+                            {% elif broker.name == 'webull' %}fa-chart-simple
+                            {% elif broker.name == 'robinhood' %}fa-arrow-trend-up
+                            {% elif broker.name == 'schwab' %}fa-landmark
+                            {% elif broker.name == 'ally' %}fa-handshake
+                            {% elif broker.name == 'etrade' %}fa-coins
+                            {% endif %}"></i>
                         </div>
                         <div class="broker-name-section">
-                            <h3>{% if broker.name == 'merrill' %}Merrill Lynch{% elif broker.name == 'schwab' %}Charles Schwab{% else %}{{ broker.display_name }}{% endif %}</h3>
+                            <h3>{% if broker.name == 'merrill' %}Merrill Lynch
+                                {% elif broker.name == 'schwab' %}Charles Schwab
+                                {% elif broker.name == 'etrade' %}E*TRADE
+                                {% else %}{{ broker.display_name }}{% endif %}</h3>
                             {% if broker.has_data and broker.account_last4 %}
                             <div class="account-info">Account ***{{ broker.account_last4 }}</div>
                             {% endif %}
@@ -1905,34 +2058,29 @@
     let geographyChart = null;
 
     function initializeRiskCharts() {
-        // Get holdings data (should already be available from main holdings table)
-        const holdings = {{ holdings|tojson|safe }};
+        // Get risk metrics from backend (passed via Jinja)
+        const riskMetrics = {{ risk_metrics|tojson|safe }};
         
-        if (!holdings || holdings.length === 0) {
+        if (!riskMetrics) {
+            console.error('No risk metrics available');
             return;
         }
         
-        // Initialize charts
-        createConcentrationChart(holdings);
-        createSectorChart(holdings);
-        createGeographyChart(holdings);
-        updateOverallRisk(holdings);
+        // Initialize charts with real data
+        createConcentrationChart(riskMetrics.concentration);
+        createSectorChart(riskMetrics.sectors);
+        createGeographyChart(riskMetrics.geography);
+        updateOverallRisk(riskMetrics.overall_risk, riskMetrics.concentration);
     }
 
-    function createConcentrationChart(holdings) {
+    function createConcentrationChart(concentration) {
         const ctx = document.getElementById('concentrationChart');
-        if (!ctx) return;
+        if (!ctx || !concentration || concentration.length === 0) return;
         
-        // Get top 5 holdings by allocation
-        const topHoldings = holdings
-            .slice()
-            .sort((a, b) => b.allocation_pct - a.allocation_pct)
-            .slice(0, 5);
-        
-        const labels = topHoldings.map(h => h.symbol);
-        const data = topHoldings.map(h => (h.allocation_pct * 100).toFixed(1));
-        const backgroundColors = topHoldings.map(h => 
-            h.allocation_pct > 0.20 ? '#ef4444' : '#667eea'
+        const labels = concentration.map(h => h.symbol);
+        const data = concentration.map(h => h.allocation_pct.toFixed(1));
+        const backgroundColors = concentration.map(h => 
+            h.allocation_pct > 20 ? '#ef4444' : '#667eea'
         );
         
         if (concentrationChart) {
@@ -1967,13 +2115,13 @@
         
         // Update warnings
         const warningsDiv = document.getElementById('concentrationWarnings');
-        const highConcentration = topHoldings.filter(h => h.allocation_pct > 0.20);
+        const highConcentration = concentration.filter(h => h.allocation_pct > 20);
         
         if (highConcentration.length > 0) {
             warningsDiv.innerHTML = highConcentration.map(h => `
                 <div class="warning-item">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <span>${h.symbol}: ${(h.allocation_pct * 100).toFixed(1)}% (over 20% limit)</span>
+                    <span>${h.symbol}: ${h.allocation_pct.toFixed(1)}% (over 20% limit)</span>
                 </div>
             `).join('');
         } else {
@@ -1986,20 +2134,25 @@
         }
     }
 
-    function createSectorChart(holdings) {
+    function createSectorChart(sectors) {
         const ctx = document.getElementById('sectorChart');
-        if (!ctx) return;
+        if (!ctx || !sectors || Object.keys(sectors).length === 0) {
+            // Show "no data" message
+            if (ctx) {
+                ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Sector data not available yet</p>';
+            }
+            return;
+        }
         
-        // Mock sector data - in production, this should come from backend
-        const sectors = {
-            'Technology': 45,
-            'Finance': 18,
-            'Healthcare': 15,
-            'Consumer': 12,
-            'Other': 10
-        };
+        // Filter out 'Unknown' if we have other sectors
+        const sectorEntries = Object.entries(sectors);
+        const filteredSectors = sectorEntries.filter(([sector, pct]) => 
+            sector !== 'Unknown' || sectorEntries.length === 1
+        );
         
-        const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b'];
+        const labels = filteredSectors.map(([sector, pct]) => sector);
+        const data = filteredSectors.map(([sector, pct]) => pct);
+        const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140'];
         
         if (sectorChart) {
             sectorChart.destroy();
@@ -2008,10 +2161,10 @@
         sectorChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: Object.keys(sectors),
+                labels: labels,
                 datasets: [{
-                    data: Object.values(sectors),
-                    backgroundColor: colors,
+                    data: data,
+                    backgroundColor: colors.slice(0, labels.length),
                     borderWidth: 0
                 }]
             },
@@ -2048,7 +2201,7 @@
         
         // Update legend
         const legendDiv = document.getElementById('sectorLegend');
-        legendDiv.innerHTML = Object.entries(sectors).map(([sector, pct], idx) => `
+        legendDiv.innerHTML = filteredSectors.map(([sector, pct], idx) => `
             <div class="legend-item">
                 <div class="legend-label">
                     <div class="legend-color" style="background: ${colors[idx]}"></div>
@@ -2059,17 +2212,24 @@
         `).join('');
     }
 
-    function createGeographyChart(holdings) {
+    function createGeographyChart(geography) {
         const ctx = document.getElementById('geographyChart');
-        if (!ctx) return;
+        if (!ctx || !geography || Object.keys(geography).length === 0) {
+            // Show "no data" message
+            if (ctx) {
+                ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Geography data not available yet</p>';
+            }
+            return;
+        }
         
-        // Mock geography data - in production, this should come from backend
-        const geography = {
-            'US': 70,
-            'International Developed': 20,
-            'Emerging Markets': 10
-        };
+        // Filter out 'Unknown' if we have other regions
+        const geoEntries = Object.entries(geography);
+        const filteredGeo = geoEntries.filter(([region, pct]) => 
+            region !== 'Unknown' || geoEntries.length === 1
+        );
         
+        const labels = filteredGeo.map(([region, pct]) => region);
+        const data = filteredGeo.map(([region, pct]) => pct);
         const colors = ['#667eea', '#764ba2', '#f093fb'];
         
         if (geographyChart) {
@@ -2079,10 +2239,10 @@
         geographyChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: Object.keys(geography),
+                labels: labels,
                 datasets: [{
-                    data: Object.values(geography),
-                    backgroundColor: colors,
+                    data: data,
+                    backgroundColor: colors.slice(0, labels.length),
                     borderWidth: 0
                 }]
             },
@@ -2099,7 +2259,7 @@
         
         // Update stats
         const statsDiv = document.getElementById('geographyStats');
-        statsDiv.innerHTML = Object.entries(geography).map(([region, pct], idx) => `
+        statsDiv.innerHTML = filteredGeo.map(([region, pct], idx) => `
             <div class="stat-item">
                 <div class="legend-label">
                     <div class="legend-color" style="background: ${colors[idx]}"></div>
@@ -2110,28 +2270,15 @@
         `).join('');
     }
 
-    function updateOverallRisk(holdings) {
-        // Calculate overall risk level based on concentration
-        const maxConcentration = Math.max(...holdings.map(h => h.allocation_pct));
-        
-        let riskLevel = 'low';
-        let riskClass = 'low';
-        
-        if (maxConcentration > 0.30) {
-            riskLevel = 'High';
-            riskClass = 'high';
-        } else if (maxConcentration > 0.20) {
-            riskLevel = 'Medium';
-            riskClass = 'medium';
-        } else {
-            riskLevel = 'Low';
-            riskClass = 'low';
-        }
-        
+    function updateOverallRisk(riskLevel, concentration) {
         const badge = document.getElementById('overallRiskBadge');
         const valueSpan = badge.querySelector('.risk-value');
-        valueSpan.textContent = riskLevel;
-        valueSpan.className = `risk-value ${riskClass}`;
+        
+        // Capitalize first letter
+        const displayRisk = riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1);
+        
+        valueSpan.textContent = displayRisk;
+        valueSpan.className = `risk-value ${riskLevel}`;
     }
 
     // Initialize charts when page loads
@@ -2142,6 +2289,80 @@
     });
     </script>     
     <!-- End Script block for risk -->
+
+    <!-- Script block for Risk Settings -->
+    <script>
+    function openRiskSettings() {
+        // Load saved settings from localStorage
+        const concentration = localStorage.getItem('risk_concentration') || 20;
+        const overlap = localStorage.getItem('risk_overlap') || 70;
+        const sector = localStorage.getItem('risk_sector') || 40;
+        
+        document.getElementById('concentrationThreshold').value = concentration;
+        document.getElementById('overlapThreshold').value = overlap;
+        document.getElementById('sectorThreshold').value = sector;
+        
+        updateConcentrationDisplay(concentration);
+        updateOverlapDisplay(overlap);
+        updateSectorDisplay(sector);
+        
+        document.getElementById('riskSettingsModal').style.display = 'flex';
+    }
+
+    function closeRiskSettings(event) {
+        if (event && event.target !== event.currentTarget) return;
+        document.getElementById('riskSettingsModal').style.display = 'none';
+    }
+
+    function updateConcentrationDisplay(value) {
+        document.getElementById('concentrationDisplay').textContent = value + '%';
+    }
+
+    function updateOverlapDisplay(value) {
+        document.getElementById('overlapDisplay').textContent = value + '%';
+    }
+
+    function updateSectorDisplay(value) {
+        document.getElementById('sectorDisplay').textContent = value + '%';
+    }
+
+    function resetRiskDefaults() {
+        document.getElementById('concentrationThreshold').value = 20;
+        document.getElementById('overlapThreshold').value = 70;
+        document.getElementById('sectorThreshold').value = 40;
+        
+        updateConcentrationDisplay(20);
+        updateOverlapDisplay(70);
+        updateSectorDisplay(40);
+    }
+
+    function saveRiskSettings() {
+        const concentration = document.getElementById('concentrationThreshold').value;
+        const overlap = document.getElementById('overlapThreshold').value;
+        const sector = document.getElementById('sectorThreshold').value;
+        
+        localStorage.setItem('risk_concentration', concentration);
+        localStorage.setItem('risk_overlap', overlap);
+        localStorage.setItem('risk_sector', sector);
+        
+        alert('Risk settings saved successfully!');
+        closeRiskSettings();
+        
+        // Refresh risk charts with new thresholds
+        if (typeof initializeRiskCharts === 'function') {
+            initializeRiskCharts();
+        }
+    }
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('riskSettingsModal').style.display === 'flex') {
+            closeRiskSettings();
+        }
+    });
+    </script>
+    
+    <!-- End Script block for Risk Settings -->
 
     <!-- Underlying Holdings Modal -->
     <div class="modal-overlay" id="underlyingModal" style="display: none;" onclick="closeUnderlyingModal(event)">
@@ -2209,5 +2430,94 @@
             </div>
         </div>
     </div>
+
+    <div class="modal-overlay" id="riskSettingsModal" style="display: none;" onclick="closeRiskSettings(event)">
+        <div class="modal-container settings-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-sliders"></i>
+                    <span>Risk Analysis Settings</span>
+                </div>
+                <button class="modal-close" onclick="closeRiskSettings()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Stock Concentration Setting -->
+                <div class="settings-section">
+                    <h4>Stock Concentration Threshold</h4>
+                    <p class="settings-description">Individual stocks exceeding this percentage will be flagged as high risk</p>
+                    
+                    <div class="setting-item">
+                        <label for="concentrationThreshold">
+                            <span class="setting-label">Warning Threshold</span>
+                            <span class="setting-current" id="concentrationDisplay">20%</span>
+                        </label>
+                        <div class="slider-container">
+                            <input type="range" id="concentrationThreshold" min="5" max="50" value="20" step="1" 
+                                oninput="updateConcentrationDisplay(this.value)">
+                            <div class="slider-labels">
+                                <span>5%</span>
+                                <span>50%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ETF Overlap Setting -->
+                <div class="settings-section">
+                    <h4>ETF/Mutual Fund Overlap</h4>
+                    <p class="settings-description">Funds with overlap above this threshold will be flagged as redundant</p>
+                    
+                    <div class="setting-item">
+                        <label for="overlapThreshold">
+                            <span class="setting-label">Overlap Warning</span>
+                            <span class="setting-current" id="overlapDisplay">70%</span>
+                        </label>
+                        <div class="slider-container">
+                            <input type="range" id="overlapThreshold" min="30" max="95" value="70" step="5" 
+                                oninput="updateOverlapDisplay(this.value)">
+                            <div class="slider-labels">
+                                <span>30%</span>
+                                <span>95%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sector Concentration Setting -->
+                <div class="settings-section">
+                    <h4>Sector Concentration Limit</h4>
+                    <p class="settings-description">Maximum allocation to a single sector before warning</p>
+                    
+                    <div class="setting-item">
+                        <label for="sectorThreshold">
+                            <span class="setting-label">Sector Limit</span>
+                            <span class="setting-current" id="sectorDisplay">40%</span>
+                        </label>
+                        <div class="slider-container">
+                            <input type="range" id="sectorThreshold" min="20" max="80" value="40" step="5" 
+                                oninput="updateSectorDisplay(this.value)">
+                            <div class="slider-labels">
+                                <span>20%</span>
+                                <span>80%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="resetRiskDefaults()">
+                    <i class="fas fa-undo"></i> Reset Defaults
+                </button>
+                <button class="btn-primary" onclick="saveRiskSettings()">
+                    <i class="fas fa-save"></i> Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

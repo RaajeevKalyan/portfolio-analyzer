@@ -9,6 +9,7 @@ import os
 from app.services.holdings_aggregator import get_current_holdings
 from app.database import db_session
 from app.models import BrokerAccount, PortfolioSnapshot, Holding
+from app.services.risk_aggregator import get_risk_metrics
 import traceback
 import sys
 from sqlalchemy import func
@@ -105,7 +106,8 @@ def register_routes(app):
             print("\n=== DASHBOARD ROUTE CALLED ===", file=sys.stderr)
             
             # Define all supported brokers
-            ALL_BROKERS = ['merrill', 'fidelity', 'webull', 'robinhood', 'schwab']
+            ALL_BROKERS = ['merrill', 'fidelity', 'webull', 'robinhood', 'schwab',
+                           'ally', 'etrade']
             
             with db_session() as session:
                 # Get all broker accounts from DB
@@ -170,11 +172,17 @@ def register_routes(app):
             holdings = holdings_data.get('holdings', [])
             print(f"Got {len(holdings)} holdings", file=sys.stderr)
             
+            # NEW: Get risk metrics
+            print("Getting risk metrics...", file=sys.stderr)
+            risk_metrics = get_risk_metrics()
+            print(f"Risk metrics calculated: {risk_metrics.get('overall_risk')} risk", file=sys.stderr)
+            
             print("Rendering template...", file=sys.stderr)
             result = render_template('dashboard.html',
                                     brokers=brokers_data,
                                     total_net_worth=total_net_worth,
-                                    holdings=holdings)
+                                    holdings=holdings,
+                                    risk_metrics=risk_metrics)  # ADD THIS
             print("Template rendered successfully!", file=sys.stderr)
             return result
                                 

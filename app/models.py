@@ -137,7 +137,13 @@ class Holding(Base):
     # For ETFs/MFs - store underlying holdings as JSON
     underlying_holdings = Column(Text, nullable=True)  # JSON array: [{"symbol": "AAPL", "weight": 0.05, "value": 1000}, ...]
     underlying_parsed = Column(Boolean, default=False, nullable=False)  # Flag if underlying holdings have been fetched
-    
+
+    # ADD THESE NEW COLUMNS:
+    sector = Column(String(100), nullable=True)  # e.g., "Technology", "Healthcare"
+    industry = Column(String(100), nullable=True)  # e.g., "Consumer Electronics", "Semiconductors"
+    country = Column(String(100), nullable=True)  # e.g., "United States", "China"
+    info_fetched = Column(Boolean, default=False, nullable=False)  # Flag if yfinance data has been retrieved
+
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     
     # Relationships
