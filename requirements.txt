@@ -26,5 +26,8 @@ lxml==4.9.4
 # Utilities
 python-dotenv==1.0.0
 
+# Sector , Domicile info
+yfinance==1.1.0
+
 # For Merrill CSV parsing (regex support)
 # (Already included in Python stdlib, but ensuring compatibility)

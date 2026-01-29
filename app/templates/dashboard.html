@@ -203,6 +203,7 @@
         .broker-icon-circle.schwab { background: linear-gradient(135deg, #00A0DC, #0077A8); }
         .broker-icon-circle.ally { background: linear-gradient(135deg, #6B2C91, #552370); }
         .broker-icon-circle.etrade { background: linear-gradient(135deg, #6633CC, #4D2699); }
+        .broker-icon-circle.wellsfargo { background: linear-gradient(135deg, #D71E28, #A01820); }
         
         .broker-name-section h3 {
             margin: 0;
@@ -1090,11 +1091,6 @@
             font-size: 0.9rem;
         }
 
-        .risk-tooltip {
-            color: var(--text-muted);
-            cursor: help;
-        }
-
         .risk-card-body {
             display: flex;
             flex-direction: column;
@@ -1344,7 +1340,85 @@
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }        
+        }
+        
+        /* Progress Indicator */
+        .resolution-progress {
+            margin-bottom: 2rem;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .progress-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            border-left: 4px solid var(--gradient-start);
+        }
+
+        .progress-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .progress-header i {
+            color: var(--gradient-start);
+        }
+
+        .progress-stats {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .progress-message {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .progress-message small {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        
+        /* end Progress Indicator */
 
     </style>
 </head>
@@ -1392,12 +1466,14 @@
                             {% elif broker.name == 'schwab' %}fa-landmark
                             {% elif broker.name == 'ally' %}fa-handshake
                             {% elif broker.name == 'etrade' %}fa-coins
+                            {% elif broker.name == 'wellsfargo' %}fa-building
                             {% endif %}"></i>
                         </div>
                         <div class="broker-name-section">
                             <h3>{% if broker.name == 'merrill' %}Merrill Lynch
                                 {% elif broker.name == 'schwab' %}Charles Schwab
                                 {% elif broker.name == 'etrade' %}E*TRADE
+                                {% elif broker.name == 'wellsfargo' %}Wells Fargo
                                 {% else %}{{ broker.display_name }}{% endif %}</h3>
                             {% if broker.has_data and broker.account_last4 %}
                             <div class="account-info">Account ***{{ broker.account_last4 }}</div>
@@ -1509,9 +1585,6 @@
                 <div class="risk-card">
                     <div class="risk-card-header">
                         <h3><i class="fas fa-chart-pie"></i> Stock Concentration</h3>
-                        <span class="risk-tooltip" title="Stocks exceeding 20% threshold">
-                            <i class="fas fa-info-circle"></i>
-                        </span>
                     </div>
                     <div class="risk-card-body">
                         <div class="chart-container-risk">
@@ -1530,9 +1603,6 @@
                 <div class="risk-card">
                     <div class="risk-card-header">
                         <h3><i class="fas fa-chart-bar"></i> Sector Allocation</h3>
-                        <span class="risk-tooltip" title="Distribution across sectors">
-                            <i class="fas fa-info-circle"></i>
-                        </span>
                     </div>
                     <div class="risk-card-body">
                         <div class="chart-container-risk">
@@ -1548,9 +1618,6 @@
                 <div class="risk-card">
                     <div class="risk-card-header">
                         <h3><i class="fas fa-globe"></i> Geographic Exposure</h3>
-                        <span class="risk-tooltip" title="Geographic distribution">
-                            <i class="fas fa-info-circle"></i>
-                        </span>
                     </div>
                     <div class="risk-card-body">
                         <div class="chart-container-risk">
@@ -1576,6 +1643,30 @@
             </div>
         </div>
         <!-- END Risk Analysis Section -->     
+
+        <div class="resolution-progress" id="resolutionProgress" style="display: none;">
+            <div class="progress-card">
+                <div class="progress-header">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Resolving Holdings Data</span>
+                </div>
+                <div class="progress-body">
+                    <div class="progress-stats">
+                        <div class="stat">
+                            <span class="stat-label">Cached Symbols:</span>
+                            <span class="stat-value" id="cachedCount">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">API Requests (this hour):</span>
+                            <span class="stat-value" id="requestCount">0 / 2000</span>
+                        </div>
+                    </div>
+                    <div class="progress-message">
+                        <small>Fetching sector and country data... This may take a few minutes with 2-second delays between requests.</small>
+                    </div>
+                </div>
+            </div>
+        </div>        
         
        <!-- Holdings Section -->
         <div class="holdings-section mt-5">
@@ -2075,12 +2166,37 @@
 
     function createConcentrationChart(concentration) {
         const ctx = document.getElementById('concentrationChart');
-        if (!ctx || !concentration || concentration.length === 0) return;
+        const warningsDiv = document.getElementById('concentrationWarnings');
+        
+        if (!ctx) return;
+        
+        // Get concentration threshold from settings (default 20)
+        const threshold = parseInt(localStorage.getItem('risk_concentration') || '20');
+        
+        // Filter to ONLY stocks (exclude ETFs and mutual funds)
+        const stocksOnly = concentration ? concentration.filter(h => {
+            // Check if holdings data has asset_type info
+            // We need to get this from the holdings data passed to template
+            return true; // For now, we'll filter on backend instead
+        }) : [];
+        
+        // Check if we have any data at all
+        if (!concentration || concentration.length === 0) {
+            // NO DATA - show placeholder message
+            ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Stock data not available yet</p>';
+            
+            if (warningsDiv) {
+                warningsDiv.innerHTML = '<div class="warning-item no-warning"><i class="fas fa-info-circle"></i><span>Upload CSV files to see concentration analysis</span></div>';
+            }
+            return;
+        }
         
         const labels = concentration.map(h => h.symbol);
         const data = concentration.map(h => h.allocation_pct.toFixed(1));
+        
+        // Color based on saved threshold setting
         const backgroundColors = concentration.map(h => 
-            h.allocation_pct > 20 ? '#ef4444' : '#667eea'
+            h.allocation_pct > threshold ? '#ef4444' : '#667eea'
         );
         
         if (concentrationChart) {
@@ -2113,15 +2229,14 @@
             }
         });
         
-        // Update warnings
-        const warningsDiv = document.getElementById('concentrationWarnings');
-        const highConcentration = concentration.filter(h => h.allocation_pct > 20);
+        // Update warnings based on threshold
+        const highConcentration = concentration.filter(h => h.allocation_pct > threshold);
         
         if (highConcentration.length > 0) {
             warningsDiv.innerHTML = highConcentration.map(h => `
                 <div class="warning-item">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <span>${h.symbol}: ${h.allocation_pct.toFixed(1)}% (over 20% limit)</span>
+                    <span>${h.symbol}: ${h.allocation_pct.toFixed(1)}% (over ${threshold}% limit)</span>
                 </div>
             `).join('');
         } else {
@@ -2133,13 +2248,18 @@
             `;
         }
     }
-
     function createSectorChart(sectors) {
         const ctx = document.getElementById('sectorChart');
         if (!ctx || !sectors || Object.keys(sectors).length === 0) {
             // Show "no data" message
             if (ctx) {
                 ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Sector data not available yet</p>';
+            }
+            
+            // Clear legend too
+            const legendDiv = document.getElementById('sectorLegend');
+            if (legendDiv) {
+                legendDiv.innerHTML = '';
             }
             return;
         }
@@ -2149,6 +2269,11 @@
         const filteredSectors = sectorEntries.filter(([sector, pct]) => 
             sector !== 'Unknown' || sectorEntries.length === 1
         );
+        
+        if (filteredSectors.length === 0) {
+            ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Sector data not available yet</p>';
+            return;
+        }
         
         const labels = filteredSectors.map(([sector, pct]) => sector);
         const data = filteredSectors.map(([sector, pct]) => pct);
@@ -2201,15 +2326,17 @@
         
         // Update legend
         const legendDiv = document.getElementById('sectorLegend');
-        legendDiv.innerHTML = filteredSectors.map(([sector, pct], idx) => `
-            <div class="legend-item">
-                <div class="legend-label">
-                    <div class="legend-color" style="background: ${colors[idx]}"></div>
-                    ${sector}
+        if (legendDiv) {
+            legendDiv.innerHTML = filteredSectors.map(([sector, pct], idx) => `
+                <div class="legend-item">
+                    <div class="legend-label">
+                        <div class="legend-color" style="background: ${colors[idx]}"></div>
+                        ${sector}
+                    </div>
+                    <div class="legend-value">${pct}%</div>
                 </div>
-                <div class="legend-value">${pct}%</div>
-            </div>
-        `).join('');
+            `).join('');
+        }
     }
 
     function createGeographyChart(geography) {
@@ -2219,6 +2346,12 @@
             if (ctx) {
                 ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Geography data not available yet</p>';
             }
+            
+            // Clear stats too
+            const statsDiv = document.getElementById('geographyStats');
+            if (statsDiv) {
+                statsDiv.innerHTML = '';
+            }
             return;
         }
         
@@ -2227,6 +2360,11 @@
         const filteredGeo = geoEntries.filter(([region, pct]) => 
             region !== 'Unknown' || geoEntries.length === 1
         );
+        
+        if (filteredGeo.length === 0) {
+            ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Geography data not available yet</p>';
+            return;
+        }
         
         const labels = filteredGeo.map(([region, pct]) => region);
         const data = filteredGeo.map(([region, pct]) => pct);
@@ -2259,19 +2397,23 @@
         
         // Update stats
         const statsDiv = document.getElementById('geographyStats');
-        statsDiv.innerHTML = filteredGeo.map(([region, pct], idx) => `
-            <div class="stat-item">
-                <div class="legend-label">
-                    <div class="legend-color" style="background: ${colors[idx]}"></div>
-                    ${region}
+        if (statsDiv) {
+            statsDiv.innerHTML = filteredGeo.map(([region, pct], idx) => `
+                <div class="stat-item">
+                    <div class="legend-label">
+                        <div class="legend-color" style="background: ${colors[idx]}"></div>
+                        ${region}
+                    </div>
+                    <div class="stat-value">${pct}%</div>
                 </div>
-                <div class="stat-value">${pct}%</div>
-            </div>
-        `).join('');
+            `).join('');
+        }
     }
 
     function updateOverallRisk(riskLevel, concentration) {
         const badge = document.getElementById('overallRiskBadge');
+        if (!badge) return;
+        
         const valueSpan = badge.querySelector('.risk-value');
         
         // Capitalize first letter
@@ -2336,6 +2478,7 @@
         updateSectorDisplay(40);
     }
 
+
     function saveRiskSettings() {
         const concentration = document.getElementById('concentrationThreshold').value;
         const overlap = document.getElementById('overlapThreshold').value;
@@ -2345,12 +2488,15 @@
         localStorage.setItem('risk_overlap', overlap);
         localStorage.setItem('risk_sector', sector);
         
+        // Show success message
         alert('Risk settings saved successfully!');
         closeRiskSettings();
         
-        // Refresh risk charts with new thresholds
+        // IMPORTANT: Refresh charts with new thresholds
         if (typeof initializeRiskCharts === 'function') {
-            initializeRiskCharts();
+            setTimeout(() => {
+                initializeRiskCharts();
+            }, 100);
         }
     }
 
@@ -2363,6 +2509,37 @@
     </script>
     
     <!-- End Script block for Risk Settings -->
+     <!-- Script Block for Progress Indicator -->
+    <script>      
+    // Check resolution progress periodically
+    function checkResolutionProgress() {
+        fetch('/api/resolution/progress')
+            .then(response => response.json())
+            .then(data => {
+                const progressDiv = document.getElementById('resolutionProgress');
+                
+                // Show progress indicator if still resolving
+                if (data.is_resolving) {
+                    progressDiv.style.display = 'block';
+                    document.getElementById('cachedCount').textContent = data.cached_symbols || 0;
+                    document.getElementById('requestCount').textContent = 
+                        `${data.requests_this_hour || 0} / ${data.rate_limit || 2000}`;
+                } else {
+                    progressDiv.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking progress:', error);
+            });
+    }
+
+    // Check every 5 seconds when page is loaded
+    setInterval(checkResolutionProgress, 5000);
+
+    // Check immediately on load
+    document.addEventListener('DOMContentLoaded', checkResolutionProgress);
+    </script>      
+     <!-- End script block for progress -->
 
     <!-- Underlying Holdings Modal -->
     <div class="modal-overlay" id="underlyingModal" style="display: none;" onclick="closeUnderlyingModal(event)">

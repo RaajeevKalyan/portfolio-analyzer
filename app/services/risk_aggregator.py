@@ -86,22 +86,32 @@ class RiskAggregator:
     def _calculate_concentration(self, holdings: List[Holding], total_value: float) -> List[Dict]:
         """
         Calculate concentration by aggregating same symbols across brokers
+        STOCKS ONLY - excludes ETFs and mutual funds
         
         Returns top 5 holdings with allocation percentage
         """
+        # Filter to stocks only (exclude ETFs and mutual funds)
+        stock_holdings = [h for h in holdings if h.asset_type == 'stock']
+        
+        if not stock_holdings:
+            logger.debug("No stock holdings found for concentration analysis")
+            return []
+        
         # Aggregate by symbol
         symbol_totals = defaultdict(lambda: {
             'symbol': '',
             'name': '',
             'value': 0,
-            'allocation_pct': 0
+            'allocation_pct': 0,
+            'asset_type': 'stock'
         })
         
-        for holding in holdings:
+        for holding in stock_holdings:
             symbol = holding.symbol
             symbol_totals[symbol]['symbol'] = symbol
             symbol_totals[symbol]['name'] = holding.name or symbol
             symbol_totals[symbol]['value'] += float(holding.total_value)
+            symbol_totals[symbol]['asset_type'] = holding.asset_type
         
         # Calculate allocation percentages
         for data in symbol_totals.values():

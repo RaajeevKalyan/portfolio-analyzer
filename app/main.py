@@ -55,7 +55,6 @@ def create_app():
         </html>
         """, 500
 
-    # *** ADD THIS - Initialize database ***
     from app.database import init_db
     with app.app_context():
         init_db()
@@ -107,7 +106,7 @@ def register_routes(app):
             
             # Define all supported brokers
             ALL_BROKERS = ['merrill', 'fidelity', 'webull', 'robinhood', 'schwab',
-                           'ally', 'etrade']
+                           'ally', 'etrade', 'wellsfargo']
             
             with db_session() as session:
                 # Get all broker accounts from DB
@@ -182,7 +181,7 @@ def register_routes(app):
                                     brokers=brokers_data,
                                     total_net_worth=total_net_worth,
                                     holdings=holdings,
-                                    risk_metrics=risk_metrics)  # ADD THIS
+                                    risk_metrics=risk_metrics)
             print("Template rendered successfully!", file=sys.stderr)
             return result
                                 
@@ -308,6 +307,54 @@ def register_routes(app):
             print(f"Error fetching underlying holdings: {e}", file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
             return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/resolution/progress')
+    def resolution_progress():
+        """
+        Get current holdings resolution progress
+        
+        Returns JSON with:
+        - is_resolving: bool (if still fetching data)
+        - cached_symbols: int
+        - requests_this_hour: int
+        - rate_limit: int
+        """
+        try:
+            from app.services.stock_info_service import get_progress_stats
+            from app.database import db_session
+            from app.models import Holding
+            
+            # Get stock info progress stats
+            stats = get_progress_stats()
+            
+            # Check if any holdings still need sector info
+            with db_session() as session:
+                unresolved = session.query(Holding).filter(
+                    Holding.info_fetched == False
+                ).count()
+                
+                etf_mf_unresolved = session.query(Holding).filter(
+                    Holding.asset_type.in_(['etf', 'mutual_fund']),
+                    Holding.underlying_parsed == False
+                ).count()
+            
+            is_resolving = (unresolved > 0) or (etf_mf_unresolved > 0)
+            
+            return jsonify({
+                'is_resolving': is_resolving,
+                'unresolved_count': unresolved,
+                'etf_mf_unresolved': etf_mf_unresolved,
+                'cached_symbols': stats.get('cached_symbols', 0),
+                'requests_this_hour': stats.get('requests_this_hour', 0),
+                'rate_limit': stats.get('rate_limit', 2000)
+            })
+            
+        except Exception as e:
+            logger.error(f"Error getting resolution progress: {e}")
+            return jsonify({
+                'is_resolving': False,
+                'error': str(e)
+            }), 500
 
 
 # Create application instance
