@@ -1,37 +1,27 @@
 """
-Updated Holdings Resolver - Fetches sector/country for underlying holdings
+Holdings Resolver Service - FINAL FIX
 
-Replace app/services/holdings_resolver.py with this version
+The fix: Write directly to holding.underlying_holdings (TEXT column)
+instead of using the property holding.underlying_holdings_list
 """
 import logging
 from typing import List, Dict, Optional
 from decimal import Decimal
 import mstarpy
 import pandas as pd
-from app.services.stock_info_service import get_stock_info
-import time
+import json
 
 logger = logging.getLogger(__name__)
 
 
 class HoldingsResolver:
-    """Resolve ETF/Mutual Fund underlying holdings and fetch sector data"""
+    """Resolve ETF/Mutual Fund underlying holdings"""
     
     def __init__(self):
         pass
     
     def resolve_holding(self, symbol: str, asset_type: str, total_value: Decimal) -> Optional[List[Dict]]:
-        """
-        Resolve underlying holdings for an ETF or Mutual Fund
-        
-        Args:
-            symbol: Ticker symbol (e.g., 'VTI', 'DBMAX')
-            asset_type: Type of asset ('etf' or 'mutual_fund')
-            total_value: Total value of the holding (for calculating weighted values)
-            
-        Returns:
-            List of dicts with underlying holdings, or None if failed
-        """
+        """Resolve underlying holdings for an ETF or Mutual Fund"""
         if asset_type not in ['etf', 'mutual_fund']:
             logger.debug(f"Skipping {symbol} - not an ETF or mutual fund (type: {asset_type})")
             return None
@@ -39,10 +29,7 @@ class HoldingsResolver:
         logger.info(f"Resolving underlying holdings for {symbol} ({asset_type})...")
         
         try:
-            # Initialize mstarpy Funds object
             fund = mstarpy.Funds(term=symbol, pageSize=1)
-            
-            # Get portfolio holdings
             holdings_df = fund.holdings()
             
             if holdings_df is None or holdings_df.empty:
@@ -51,32 +38,23 @@ class HoldingsResolver:
             
             logger.info(f"Found {len(holdings_df)} holdings for {symbol}")
             
-            # Process holdings DataFrame
             underlying = []
             
             for idx, row in holdings_df.iterrows():
                 try:
-                    # Extract ticker symbol
                     ticker = None
                     if 'ticker' in row and pd.notna(row['ticker']) and str(row['ticker']).strip():
                         ticker = str(row['ticker']).strip().upper()
                     elif 'secId' in row and pd.notna(row['secId']) and str(row['secId']).strip():
                         ticker = str(row['secId']).strip().upper()
                     
-                    # Get name
                     name = str(row['securityName']).strip() if pd.notna(row.get('securityName')) else ''
-                    
-                    # Get weight (percentage format, e.g., 3.70392 = 3.70%)
                     weight = float(row['weighting']) if pd.notna(row.get('weighting')) else 0.0
                     
-                    # Skip if no ticker or weight
                     if not ticker or weight == 0:
                         continue
                     
-                    # Convert weight to decimal
                     weight_decimal = weight / 100.0
-                    
-                    # Calculate estimated value based on weight
                     estimated_value = float(total_value) * weight_decimal
                     
                     underlying.append({
@@ -95,9 +73,7 @@ class HoldingsResolver:
                 logger.warning(f"No valid holdings extracted for {symbol}")
                 return None
             
-            # Sort by weight descending
             underlying.sort(key=lambda x: x['weight'], reverse=True)
-
             logger.info(f"Successfully resolved {len(underlying)} holdings for {symbol}")
             
             return underlying
@@ -108,15 +84,7 @@ class HoldingsResolver:
             return None
     
     def resolve_multiple_holdings(self, holdings: List[Dict]) -> Dict[int, List[Dict]]:
-        """
-        Resolve multiple holdings in batch
-        
-        Args:
-            holdings: List of dicts with keys: id, symbol, asset_type, total_value
-            
-        Returns:
-            Dict mapping holding_id to underlying holdings list
-        """
+        """Resolve multiple holdings in batch"""
         results = {}
         
         for holding in holdings:
@@ -139,15 +107,9 @@ class HoldingsResolver:
 
 
 def fetch_stock_info_for_holding(holding) -> bool:
-    """
-    Fetch sector/geography information for a holding using mstarpy
+    """Fetch sector/geography information for a holding using yfinance"""
+    from app.services.stock_info_service import get_stock_info
     
-    Args:
-        holding: Holding model object
-        
-    Returns:
-        bool: True if successful
-    """
     if holding.info_fetched:
         logger.debug(f"Info already fetched for {holding.symbol}, skipping")
         return True
@@ -157,19 +119,27 @@ def fetch_stock_info_for_holding(holding) -> bool:
         stock_info = get_stock_info(holding.symbol)
         
         if stock_info:
-            holding.sector = stock_info.get('sector')
-            holding.industry = stock_info.get('industry')
-            holding.country = stock_info.get('country')
+            holding.sector = stock_info.get('sector', 'Unknown')
+            holding.industry = stock_info.get('industry', 'Unknown')
+            holding.country = stock_info.get('country', 'Unknown')
             holding.info_fetched = True
-            logger.info(f"✓ Info fetched for {holding.symbol}: {stock_info.get('sector')} / {stock_info.get('country')}")
+            
+            logger.info(f"✓ Saved info for {holding.symbol}: sector={holding.sector}, country={holding.country}")
             return True
         else:
-            logger.warning(f"Could not fetch info for {holding.symbol}")
+            logger.warning(f"No info returned for {holding.symbol}")
+            holding.sector = 'Unknown'
+            holding.industry = 'Unknown'
+            holding.country = 'Unknown'
             holding.info_fetched = True
             return False
             
     except Exception as e:
         logger.error(f"Error fetching info for {holding.symbol}: {e}")
+        logger.exception(e)
+        holding.sector = 'Unknown'
+        holding.industry = 'Unknown'
+        holding.country = 'Unknown'
         holding.info_fetched = True
         return False
 
@@ -178,72 +148,74 @@ def fetch_sector_info_for_underlying_holdings(holding) -> int:
     """
     Fetch sector/geography info for all underlying holdings of an ETF/MF
     
-    Args:
-        holding: Holding model object with underlying_holdings_list
-        
-    Returns:
-        Number of underlying holdings successfully enriched with sector data
+    CRITICAL FIX: Writes directly to holding.underlying_holdings (TEXT column)
     """
+    from app.services.stock_info_service import get_stock_info
+    
     if not holding.underlying_holdings_list:
         logger.debug(f"No underlying holdings for {holding.symbol}")
         return 0
     
     try:
-        logger.info(f"Fetching sector info for {len(holding.underlying_holdings_list)} underlying holdings in {holding.symbol}")
+        # Get the list (creates a copy)
+        underlying_list = holding.underlying_holdings_list
+        total_underlying = len(underlying_list)
+        
+        logger.info(f"=" * 80)
+        logger.info(f"STARTING: Fetching sector info for {total_underlying} underlying holdings in {holding.symbol}")
+        logger.info(f"=" * 80)
         
         enriched_count = 0
+        skipped_count = 0
         
-        for underlying in holding.underlying_holdings_list:
-            # Check if we already have sector info
-            if 'sector' in underlying and underlying['sector'] != 'Unknown':
+        for idx, underlying in enumerate(underlying_list, 1):
+            if 'sector' in underlying and underlying.get('sector') not in [None, 'Unknown', '', 'NOT SET']:
+                logger.debug(f"  [{idx}/{total_underlying}] {underlying['symbol']} - sector already exists: {underlying.get('sector')}")
                 enriched_count += 1
+                skipped_count += 1
                 continue
             
-            # Fetch sector info for this underlying holding
             symbol = underlying['symbol']
+            logger.info(f"  [{idx}/{total_underlying}] Fetching sector for {symbol}...")
+            
             stock_info = get_stock_info(symbol)
             
             if stock_info:
-                # Add sector/country data to underlying holding
                 underlying['sector'] = stock_info.get('sector', 'Unknown')
                 underlying['industry'] = stock_info.get('industry', 'Unknown')
                 underlying['country'] = stock_info.get('country', 'Unknown')
                 underlying['geography'] = stock_info.get('geography', 'Unknown')
                 enriched_count += 1
-                
-                # Small delay to be respectful to Morningstar
-                time.sleep(0.1)
+                logger.info(f"  [{idx}/{total_underlying}] ✓ {symbol}: sector={underlying['sector']}, country={underlying['country']}")
+            else:
+                logger.warning(f"  [{idx}/{total_underlying}] ✗ No info returned for {symbol}")
+                underlying['sector'] = 'Unknown'
+                underlying['industry'] = 'Unknown'
+                underlying['country'] = 'Unknown'
+                underlying['geography'] = 'Unknown'
         
-        # Update the holding with enriched data
-        # The property setter will handle JSON serialization
-        holding.underlying_holdings_list = holding.underlying_holdings_list
+        # CRITICAL FIX: Write directly to the TEXT column
+        holding.underlying_holdings = json.dumps(underlying_list)
         
-        logger.info(f"Enriched {enriched_count}/{len(holding.underlying_holdings_list)} underlying holdings for {holding.symbol}")
+        logger.info(f"=" * 80)
+        logger.info(f"COMPLETED: {holding.symbol} - Enriched {enriched_count}/{total_underlying} underlying holdings ({skipped_count} already had data)")
+        logger.info(f"=" * 80)
         return enriched_count
         
     except Exception as e:
         logger.error(f"Error enriching underlying holdings for {holding.symbol}: {e}")
+        logger.exception(e)
         return 0
 
 
 def resolve_snapshot_holdings(snapshot_id: int) -> int:
-    """
-    Resolve all ETF/MF holdings for a given snapshot
-    AND fetch sector/geography info for ALL holdings (including underlying)
-    
-    Args:
-        snapshot_id: Portfolio snapshot ID
-        
-    Returns:
-        Number of holdings successfully resolved
-    """
+    """Resolve all ETF/MF holdings for a given snapshot"""
     from app.database import db_session
     from app.models import Holding
     
     logger.info(f"Starting holdings resolution for snapshot {snapshot_id}")
     
     with db_session() as session:
-        # Get all holdings for this snapshot
         all_holdings = session.query(Holding).filter(
             Holding.portfolio_snapshot_id == snapshot_id
         ).all()
@@ -252,17 +224,15 @@ def resolve_snapshot_holdings(snapshot_id: int) -> int:
             logger.info(f"No holdings found for snapshot {snapshot_id}")
             return 0
         
-        # Separate ETF/MF from regular stocks
         etf_mf_holdings = [h for h in all_holdings 
                           if h.asset_type in ['etf', 'mutual_fund'] and not h.underlying_parsed]
         
         logger.info(f"Found {len(all_holdings)} total holdings ({len(etf_mf_holdings)} ETF/MF to resolve)")
         
-        # Resolve ETF/MF underlying holdings
+        # STEP 1: Resolve ETF/MF underlying holdings
         resolved_count = 0
         
         if etf_mf_holdings:
-            # Prepare data for resolver
             holdings_data = [
                 {
                     'id': h.id,
@@ -273,44 +243,37 @@ def resolve_snapshot_holdings(snapshot_id: int) -> int:
                 for h in etf_mf_holdings
             ]
             
-            # Resolve holdings
             resolver = HoldingsResolver()
             results = resolver.resolve_multiple_holdings(holdings_data)
             
-            # Update database with results
             for holding in etf_mf_holdings:
                 if holding.id in results:
-                    # Store underlying holdings as JSON
                     holding.underlying_holdings_list = results[holding.id]
                     holding.underlying_parsed = True
                     resolved_count += 1
                     logger.info(f"Stored {len(results[holding.id])} underlying holdings for {holding.symbol}")
                 else:
-                    # Mark as parsed even if failed
                     holding.underlying_parsed = True
                     logger.warning(f"Failed to resolve {holding.symbol}, marking as parsed")
             
-            # Commit after resolving underlying holdings
             session.commit()
             logger.info(f"Successfully resolved {resolved_count}/{len(etf_mf_holdings)} ETF/MF holdings")
         
-        # Fetch sector/geography info for ALL holdings (parent holdings)
+        # STEP 2: Fetch sector info for parent holdings
         info_fetched_count = 0
         holdings_needing_info = [h for h in all_holdings if not h.info_fetched]
         
         if holdings_needing_info:
-            logger.info(f"Fetching sector/geography info for {len(holdings_needing_info)} parent holdings...")
+            logger.info(f"Fetching sector info for {len(holdings_needing_info)} parent holdings...")
             
             for holding in holdings_needing_info:
                 if fetch_stock_info_for_holding(holding):
                     info_fetched_count += 1
-                time.sleep(0.1)  # Small delay
             
-            # Commit after fetching parent info
             session.commit()
-            logger.info(f"Successfully fetched info for {info_fetched_count}/{len(holdings_needing_info)} parent holdings")
+            logger.info(f"✓ Fetched and SAVED info for {info_fetched_count}/{len(holdings_needing_info)} parent holdings")
         
-        # NEW: Fetch sector info for UNDERLYING holdings
+        # STEP 3: Fetch sector info for UNDERLYING holdings
         underlying_enriched_count = 0
         etf_mf_with_underlying = [h for h in all_holdings 
                                   if h.asset_type in ['etf', 'mutual_fund'] and h.underlying_holdings_list]
@@ -322,9 +285,8 @@ def resolve_snapshot_holdings(snapshot_id: int) -> int:
                 enriched = fetch_sector_info_for_underlying_holdings(holding)
                 underlying_enriched_count += enriched
             
-            # Commit after enriching underlying holdings
             session.commit()
-            logger.info(f"Enriched {underlying_enriched_count} total underlying holdings")
+            logger.info(f"✓ Enriched and SAVED {underlying_enriched_count} total underlying holdings")
         
         logger.info(f"Snapshot {snapshot_id} complete: {resolved_count} ETF/MF resolved, " +
                    f"{info_fetched_count} parent info fetched, {underlying_enriched_count} underlying enriched")
@@ -333,23 +295,18 @@ def resolve_snapshot_holdings(snapshot_id: int) -> int:
 
 
 def resolve_all_unresolved_holdings() -> int:
-    """
-    Resolve ALL unresolved ETF/MF holdings across all snapshots
-    AND fetch sector/geography info for all holdings
-    """
+    """Resolve ALL unresolved ETF/MF holdings across all snapshots"""
     from app.database import db_session
     from app.models import Holding
     
     logger.info("Starting global holdings resolution")
     
     with db_session() as session:
-        # Get all unresolved ETF/MF holdings
         unresolved_etf_mf = session.query(Holding).filter(
             Holding.asset_type.in_(['etf', 'mutual_fund']),
             Holding.underlying_parsed == False
         ).all()
         
-        # Get all holdings missing sector/geography info
         holdings_needing_info = session.query(Holding).filter(
             Holding.info_fetched == False
         ).all()
@@ -361,7 +318,6 @@ def resolve_all_unresolved_holdings() -> int:
             logger.info("Nothing to resolve")
             return 0
         
-        # Group by snapshot
         snapshots_to_process = set()
         
         for h in unresolved_etf_mf:

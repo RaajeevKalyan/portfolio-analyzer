@@ -1,7 +1,7 @@
 """
-Holdings Aggregator Service
+Holdings Aggregator Service - WITH SECTOR/COUNTRY
 
-Aggregates holdings across all brokers and calculates portfolio-level metrics.
+CRITICAL FIX: Pass sector and country from database to UI
 """
 import logging
 from typing import List, Dict, Optional
@@ -17,19 +17,8 @@ class HoldingsAggregator:
     """Aggregate and analyze portfolio holdings"""
     
     def get_aggregated_holdings(self) -> Dict:
-        """
-        Get current holdings aggregated across all brokers
-        
-        Returns:
-            dict: {
-                'total_value': Decimal,
-                'holdings': List[Dict],  # Aggregated holdings
-                'direct_holdings': Dict[symbol, data],  # Direct stock holdings only
-                'underlying_holdings': Dict[symbol, data]  # Holdings from ETF/MF
-            }
-        """
+        """Get current holdings aggregated across all brokers"""
         with db_session() as session:
-            # Get latest snapshot per broker
             latest_snapshots = self._get_latest_snapshots(session)
             
             if not latest_snapshots:
@@ -40,20 +29,12 @@ class HoldingsAggregator:
                     'underlying_holdings': {}
                 }
             
-            # Aggregate holdings by symbol
             aggregated = self._aggregate_by_symbol(session, latest_snapshots)
-            
-            # Calculate totals
             total_value = sum(h['total_value'] for h in aggregated)
-            
-            # Separate direct vs underlying holdings
             direct_holdings = self._get_direct_holdings(aggregated)
             underlying_holdings = self._get_underlying_holdings(session, aggregated)
-            
-            # Detect overlaps
             overlaps = self._detect_overlaps(direct_holdings, underlying_holdings)
             
-            # Add overlap info to holdings
             for holding in aggregated:
                 symbol = holding['symbol']
                 if symbol in overlaps:
@@ -76,12 +57,9 @@ class HoldingsAggregator:
         from sqlalchemy import desc
         
         latest_snapshots = []
-        
-        # Get all active broker accounts
         accounts = session.query(BrokerAccount).filter_by(is_active=True).all()
         
         for account in accounts:
-            # Get latest snapshot for this account
             snapshot = session.query(PortfolioSnapshot).filter_by(
                 broker_account_id=account.id
             ).order_by(desc(PortfolioSnapshot.snapshot_date)).first()
@@ -92,12 +70,7 @@ class HoldingsAggregator:
         return latest_snapshots
     
     def _aggregate_by_symbol(self, session, snapshots: List[PortfolioSnapshot]) -> List[Dict]:
-        """
-        Aggregate holdings by symbol across all snapshots
-        
-        Returns list of holdings with broker breakdown
-        """
-        # Group by symbol
+        """Aggregate holdings by symbol across all snapshots"""
         symbol_data = defaultdict(lambda: {
             'symbol': '',
             'name': '',
@@ -105,9 +78,11 @@ class HoldingsAggregator:
             'average_price': Decimal('0.00'),
             'total_value': Decimal('0.00'),
             'asset_type': '',
-            'brokers': [],  # List of {broker, quantity, value, price}
+            'brokers': [],
             'is_etf_or_mf': False,
-            'underlying_count': 0
+            'underlying_count': 0,
+            'sector': None,          # NEW
+            'country': None          # NEW
         })
         
         for snapshot in snapshots:
@@ -117,22 +92,22 @@ class HoldingsAggregator:
                 symbol = holding.symbol
                 data = symbol_data[symbol]
                 
-                # Set basic info (from first occurrence)
                 if not data['symbol']:
                     data['symbol'] = holding.symbol
                     data['name'] = holding.name
                     data['asset_type'] = holding.asset_type
                     data['is_etf_or_mf'] = holding.asset_type in ['etf', 'mutual_fund']
                     
-                    # Count underlying holdings if available
+                    # NEW: Add sector and country
+                    data['sector'] = holding.sector
+                    data['country'] = holding.country
+                    
                     if holding.underlying_holdings_list:
                         data['underlying_count'] = len(holding.underlying_holdings_list)
                 
-                # Aggregate values
                 data['total_quantity'] += holding.quantity
                 data['total_value'] += holding.total_value
                 
-                # Add broker breakdown
                 data['brokers'].append({
                     'broker': broker_name,
                     'broker_display': broker_name.replace('_', ' ').title(),
@@ -142,16 +117,13 @@ class HoldingsAggregator:
                     'account_last4': snapshot.broker_account.account_number_last4
                 })
         
-        # Calculate weighted average price and allocation percentages
         result = []
         total_portfolio_value = sum(data['total_value'] for data in symbol_data.values())
         
         for data in symbol_data.values():
-            # Calculate average price
             if data['total_quantity'] > 0:
                 data['average_price'] = data['total_value'] / data['total_quantity']
             
-            # Calculate allocation percentage
             if total_portfolio_value > 0:
                 data['allocation_pct'] = float(data['total_value'] / total_portfolio_value)
             else:
@@ -159,17 +131,12 @@ class HoldingsAggregator:
             
             result.append(data)
         
-        # Sort by total value descending
         result.sort(key=lambda x: x['total_value'], reverse=True)
         
         return result
     
     def _get_direct_holdings(self, aggregated: List[Dict]) -> Dict[str, Dict]:
-        """
-        Extract direct stock holdings (not through ETFs/MFs)
-        
-        Returns dict mapping symbol to holding data
-        """
+        """Extract direct stock holdings"""
         direct = {}
         
         for holding in aggregated:
@@ -183,19 +150,14 @@ class HoldingsAggregator:
         return direct
     
     def _get_underlying_holdings(self, session, aggregated: List[Dict]) -> Dict[str, Dict]:
-        """
-        Extract and aggregate underlying holdings from all ETFs/MFs
-        
-        Returns dict mapping symbol to aggregated underlying data
-        """
+        """Extract and aggregate underlying holdings from all ETFs/MFs"""
         underlying_total = defaultdict(lambda: {
             'symbol': '',
             'name': '',
             'total_value': Decimal('0.00'),
-            'sources': []  # Which ETF/MF contains this
+            'sources': []
         })
         
-        # Process each ETF/MF
         for holding in aggregated:
             if not holding['is_etf_or_mf']:
                 continue
@@ -203,11 +165,8 @@ class HoldingsAggregator:
             parent_symbol = holding['symbol']
             parent_value = holding['total_value']
             
-            # Get the actual Holding objects to access underlying_holdings
-            # This is a bit inefficient but works
             snapshot_ids = []
             for broker_info in holding['brokers']:
-                # Get snapshot for this broker
                 broker_account = session.query(BrokerAccount).filter_by(
                     broker_name=broker_info['broker']
                 ).first()
@@ -221,7 +180,6 @@ class HoldingsAggregator:
                     if snapshot:
                         snapshot_ids.append(snapshot.id)
             
-            # Get holdings from these snapshots
             holdings_objs = session.query(Holding).filter(
                 Holding.portfolio_snapshot_id.in_(snapshot_ids),
                 Holding.symbol == parent_symbol
@@ -233,7 +191,6 @@ class HoldingsAggregator:
                 if not underlying_list:
                     continue
                 
-                # Process each underlying holding
                 for underlying in underlying_list:
                     symbol = underlying['symbol']
                     name = underlying.get('name', symbol)
@@ -253,7 +210,6 @@ class HoldingsAggregator:
                         'value': value
                     })
         
-        # Convert to regular dict
         result = {}
         for symbol, data in underlying_total.items():
             result[symbol] = data
@@ -261,16 +217,11 @@ class HoldingsAggregator:
         return result
     
     def _detect_overlaps(self, direct: Dict, underlying: Dict) -> Dict[str, List[Dict]]:
-        """
-        Detect stocks held both directly and through ETFs/MFs
-        
-        Returns dict mapping symbol to list of overlap sources
-        """
+        """Detect stocks held both directly and through ETFs/MFs"""
         overlaps = {}
         
         for symbol in direct.keys():
             if symbol in underlying:
-                # This stock is held both directly and in funds
                 overlaps[symbol] = {
                     'direct_value': direct[symbol]['value'],
                     'underlying_value': underlying[symbol]['total_value'],
@@ -281,11 +232,6 @@ class HoldingsAggregator:
 
 
 def get_current_holdings() -> Dict:
-    """
-    Convenience function to get current aggregated holdings
-    
-    Returns:
-        dict: Aggregated holdings data
-    """
+    """Convenience function to get current aggregated holdings"""
     aggregator = HoldingsAggregator()
     return aggregator.get_aggregated_holdings()

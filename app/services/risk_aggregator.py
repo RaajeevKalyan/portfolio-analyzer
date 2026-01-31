@@ -82,22 +82,17 @@ class RiskAggregator:
                 latest_snapshots.append(snapshot)
         
         return latest_snapshots
-    
+
     def _calculate_concentration(self, holdings: List[Holding], total_value: float) -> List[Dict]:
         """
-        Calculate concentration by aggregating same symbols across brokers
-        STOCKS ONLY - excludes ETFs and mutual funds
-        
-        Returns top 5 holdings with allocation percentage
+        Calculate concentration - ONLY return stocks exceeding threshold
+        Includes both direct holdings and underlying holdings from ETFs/MFs
         """
-        # Filter to stocks only (exclude ETFs and mutual funds)
-        stock_holdings = [h for h in holdings if h.asset_type == 'stock']
+        from collections import defaultdict
         
-        if not stock_holdings:
-            logger.debug("No stock holdings found for concentration analysis")
-            return []
+        # Get threshold from somewhere (default 20%)
+        threshold = 20.0  # TODO: Make this configurable
         
-        # Aggregate by symbol
         symbol_totals = defaultdict(lambda: {
             'symbol': '',
             'name': '',
@@ -106,43 +101,76 @@ class RiskAggregator:
             'asset_type': 'stock'
         })
         
-        for holding in stock_holdings:
-            symbol = holding.symbol
-            symbol_totals[symbol]['symbol'] = symbol
-            symbol_totals[symbol]['name'] = holding.name or symbol
-            symbol_totals[symbol]['value'] += float(holding.total_value)
-            symbol_totals[symbol]['asset_type'] = holding.asset_type
+        # Process all holdings (direct stocks + underlying)
+        for holding in holdings:
+            if holding.asset_type == 'stock':
+                symbol = holding.symbol
+                symbol_totals[symbol]['symbol'] = symbol
+                symbol_totals[symbol]['name'] = holding.name or symbol
+                symbol_totals[symbol]['value'] += float(holding.total_value)
+                symbol_totals[symbol]['asset_type'] = 'stock'
+            
+            elif holding.asset_type in ['etf', 'mutual_fund'] and holding.underlying_holdings_list:
+                for underlying in holding.underlying_holdings_list:
+                    symbol = underlying['symbol']
+                    underlying_value = float(underlying.get('value', 0))
+                    
+                    symbol_totals[symbol]['symbol'] = symbol
+                    symbol_totals[symbol]['name'] = underlying.get('name', symbol)
+                    symbol_totals[symbol]['value'] += underlying_value
+                    symbol_totals[symbol]['asset_type'] = 'stock'
         
         # Calculate allocation percentages
         for data in symbol_totals.values():
             data['allocation_pct'] = (data['value'] / total_value * 100) if total_value > 0 else 0
         
-        # Sort by value and get top 5
-        top_holdings = sorted(
-            symbol_totals.values(),
-            key=lambda x: x['value'],
-            reverse=True
-        )[:5]
+        # FILTER: Only stocks EXCEEDING threshold
+        high_concentration = [
+            data for data in symbol_totals.values()
+            if data['allocation_pct'] > threshold
+        ]
         
-        return top_holdings
-    
+        # Sort by allocation descending
+        high_concentration.sort(key=lambda x: x['allocation_pct'], reverse=True)
+        
+        logger.info(f"Found {len(high_concentration)} stocks exceeding {threshold}% threshold")
+        
+        return high_concentration    
+
     def _calculate_sector_breakdown(self, holdings: List[Holding], total_value: float) -> Dict[str, float]:
         """
         Calculate sector allocation breakdown
-        
-        Returns dict mapping sector name to percentage
+        Includes both direct holdings AND underlying holdings from ETFs/MFs
         """
+        from app.services.stock_info_service import StockInfoService
+        from collections import defaultdict
+        
+        service = StockInfoService()
         sector_totals = defaultdict(float)
         
         for holding in holdings:
-            sector = holding.sector or 'Unknown'
-            sector_totals[sector] += float(holding.total_value)
+            # Direct stock holdings - use their sector
+            if holding.asset_type == 'stock':
+                sector = holding.sector or 'Unknown'
+                sector_totals[sector] += float(holding.total_value)
+            
+            # ETF/MF with underlying - aggregate underlying sectors
+            elif holding.asset_type in ['etf', 'mutual_fund'] and holding.underlying_holdings_list:
+                for underlying in holding.underlying_holdings_list:
+                    sector = underlying.get('sector', 'Unknown')
+                    underlying_value = float(underlying.get('value', 0))
+                    sector_totals[sector] += underlying_value
+            
+            # ETF/MF without underlying - use parent sector
+            elif holding.asset_type in ['etf', 'mutual_fund']:
+                sector = holding.sector or 'Unknown'
+                sector_totals[sector] += float(holding.total_value)
         
         # Convert to percentages
         sector_percentages = {}
         for sector, value in sector_totals.items():
             pct = (value / total_value * 100) if total_value > 0 else 0
-            if pct >= 1.0:  # Only include sectors with at least 1%
+            if pct >= 0.1:  # Include sectors with at least 0.1%
                 sector_percentages[sector] = round(pct, 1)
         
         # Sort by percentage descending
@@ -152,29 +180,47 @@ class RiskAggregator:
             reverse=True
         ))
         
+        logger.info(f"Sector breakdown: {sector_percentages}")
         return sector_percentages
-    
+
+
     def _calculate_geography_breakdown(self, holdings: List[Holding], total_value: float) -> Dict[str, float]:
         """
         Calculate geographic allocation breakdown
-        
-        Returns dict mapping geography to percentage
+        Includes both direct holdings AND underlying holdings from ETFs/MFs
         """
         from app.services.stock_info_service import StockInfoService
+        from collections import defaultdict
         
-        geo_service = StockInfoService()
+        service = StockInfoService()
         geo_totals = defaultdict(float)
         
         for holding in holdings:
-            country = holding.country or 'Unknown'
-            geography = geo_service._map_country_to_geography(country)
-            geo_totals[geography] += float(holding.total_value)
+            # Direct stock holdings - use their country
+            if holding.asset_type == 'stock':
+                country = holding.country or 'Unknown'
+                geography = service._map_country_to_geography(country)
+                geo_totals[geography] += float(holding.total_value)
+            
+            # ETF/MF with underlying - aggregate underlying geographies
+            elif holding.asset_type in ['etf', 'mutual_fund'] and holding.underlying_holdings_list:
+                for underlying in holding.underlying_holdings_list:
+                    country = underlying.get('country', 'Unknown')
+                    geography = service._map_country_to_geography(country)
+                    underlying_value = float(underlying.get('value', 0))
+                    geo_totals[geography] += underlying_value
+            
+            # ETF/MF without underlying - use parent country
+            elif holding.asset_type in ['etf', 'mutual_fund']:
+                country = holding.country or 'Unknown'
+                geography = service._map_country_to_geography(country)
+                geo_totals[geography] += float(holding.total_value)
         
         # Convert to percentages
         geo_percentages = {}
         for geo, value in geo_totals.items():
             pct = (value / total_value * 100) if total_value > 0 else 0
-            if pct >= 1.0:  # Only include regions with at least 1%
+            if pct >= 0.1:  # Include regions with at least 0.1%
                 geo_percentages[geo] = round(pct, 1)
         
         # Sort by percentage descending
@@ -184,7 +230,10 @@ class RiskAggregator:
             reverse=True
         ))
         
+        logger.info(f"Geography breakdown: {geo_percentages}")
         return geo_percentages
+
+
     
     def _calculate_overall_risk(self, concentration: List[Dict]) -> str:
         """
