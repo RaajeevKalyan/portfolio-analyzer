@@ -1469,7 +1469,85 @@
             font-size: 0.8rem;
             color: var(--text-muted);
             font-style: italic;
-        }        
+        }
+        /* Chart legends */
+        .chart-legend,
+        .sector-legend {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .chart-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .legend-label {
+            flex: 1;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .legend-value {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        /* modal table changes */
+        .underlying-table-wrapper {
+            max-height: 500px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ensure table takes full width */
+        .underlying-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: auto;
+        }
+
+        /* Make header sticky */
+        .underlying-table thead th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+            z-index: 10;
+            border-bottom: 2px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Ensure body displays normally */
+        .underlying-table tbody {
+            display: table-row-group;
+        }
+
+        .underlying-table thead {
+            display: table-header-group;
+        }
+
+        .underlying-table tr {
+            display: table-row;
+        }
+
+        .underlying-table th,
+        .underlying-table td {
+            display: table-cell;
+        }
+   
     </style>
 </head>
 <body>
@@ -1673,7 +1751,7 @@
                         <div class="chart-container-risk">
                             <canvas id="geographyChart"></canvas>
                         </div>
-                        <div class="geography-stats" id="geographyStats">
+                        <div class="chart-legend" id="geographyLegend">
                             <!-- Populated by JavaScript -->
                         </div>
                     </div>
@@ -2306,36 +2384,37 @@
             </div>
         `).join('');
     }
+
     function createSectorChart(sectors) {
         const ctx = document.getElementById('sectorChart');
-        if (!ctx || !sectors || Object.keys(sectors).length === 0) {
-            // Show "no data" message
-            if (ctx) {
-                ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Sector data not available yet</p>';
-            }
-            
-            // Clear legend too
-            const legendDiv = document.getElementById('sectorLegend');
-            if (legendDiv) {
-                legendDiv.innerHTML = '';
-            }
-            return;
-        }
+        const legendDiv = document.getElementById('sectorLegend');
         
-        // Filter out 'Unknown' if we have other sectors
-        const sectorEntries = Object.entries(sectors);
-        const filteredSectors = sectorEntries.filter(([sector, pct]) => 
-            sector !== 'Unknown' || sectorEntries.length === 1
-        );
+        if (!ctx) return;
         
-        if (filteredSectors.length === 0) {
+        // Hide if no data or only Unknown
+        if (!sectors || Object.keys(sectors).length === 0) {
             ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Sector data not available yet</p>';
+            if (legendDiv) legendDiv.innerHTML = '';
             return;
         }
         
-        const labels = filteredSectors.map(([sector, pct]) => sector);
-        const data = filteredSectors.map(([sector, pct]) => pct);
-        const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140'];
+        if (Object.keys(sectors).length === 1 && sectors['Unknown']) {
+            ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Sector data not available yet</p>';
+            if (legendDiv) legendDiv.innerHTML = '';
+            return;
+        }
+        
+        const labels = Object.keys(sectors);
+        const data = Object.values(sectors);
+        
+        // Get threshold from localStorage
+        const threshold = parseInt(localStorage.getItem('risk_sector') || '40');
+        
+        // Color sectors exceeding threshold in red
+        const backgroundColors = labels.map((label, idx) => {
+            if (label === 'Unknown') return '#cbd5e0';
+            return data[idx] > threshold ? '#ef4444' : '#667eea';
+        });
         
         if (sectorChart) {
             sectorChart.destroy();
@@ -2347,53 +2426,44 @@
                 labels: labels,
                 datasets: [{
                     data: data,
-                    backgroundColor: colors.slice(0, labels.length),
-                    borderWidth: 0
+                    backgroundColor: backgroundColors,
+                    borderColor: '#ffffff',
+                    borderWidth: 2
                 }]
             },
             options: {
+                indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                indexAxis: 'y',
                 plugins: {
-                    legend: {
-                        display: false
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => context.parsed.x + '%'
+                        }
                     }
                 },
                 scales: {
                     x: {
-                        grid: {
-                            color: 'var(--border-color)'
-                        },
+                        beginAtZero: true,
+                        max: 100,
                         ticks: {
-                            color: 'var(--text-secondary)',
                             callback: (value) => value + '%'
-                        }
-                    },
-                    y: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            color: 'var(--text-primary)'
                         }
                     }
                 }
             }
         });
         
-        // Update legend
-        const legendDiv = document.getElementById('sectorLegend');
+        // Add legend
         if (legendDiv) {
-            legendDiv.innerHTML = filteredSectors.map(([sector, pct], idx) => `
-                <div class="legend-item">
-                    <div class="legend-label">
-                        <div class="legend-color" style="background: ${colors[idx]}"></div>
-                        ${sector}
-                    </div>
-                    <div class="legend-value">${pct}%</div>
-                </div>
-            `).join('');
+            legendDiv.innerHTML = labels.map((label, idx) =>
+                '<div class="chart-legend-item">' +
+                    '<div class="legend-color" style="background: ' + backgroundColors[idx] + ';"></div>' +
+                    '<span class="legend-label">' + label + '</span>' +
+                    '<span class="legend-value">' + data[idx] + '%</span>' +
+                '</div>'
+            ).join('');
         }
     }
 
@@ -2403,25 +2473,29 @@
         
         if (!ctx) return;
         
-        // Check if we have data
+        // Check if we have meaningful data (not 100% Unknown)
         if (!geography || Object.keys(geography).length === 0) {
             ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Geography data not available yet</p>';
-            
-            if (legendDiv) {
-                legendDiv.innerHTML = '';
-            }
+            if (legendDiv) legendDiv.innerHTML = '';
+            return;
+        }
+        
+        // Check if only Unknown
+        if (Object.keys(geography).length === 1 && geography['Unknown']) {
+            ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Geography data not available yet</p>';
+            if (legendDiv) legendDiv.innerHTML = '';
             return;
         }
         
         const labels = Object.keys(geography);
         const data = Object.values(geography);
         
-        // Color mapping for geography
+        // Color mapping
         const colorMap = {
             'US': '#667eea',
             'International Developed': '#764ba2',
             'Emerging Markets': '#f093fb',
-            'Unknown': '#cbd5e0'  // Gray for unknown
+            'Unknown': '#cbd5e0'
         };
         
         const backgroundColors = labels.map(label => colorMap[label] || '#a0aec0');
@@ -2437,38 +2511,37 @@
                 datasets: [{
                     data: data,
                     backgroundColor: backgroundColors,
-                    borderColor: '#ffffff',  // White borders
-                    borderWidth: 3           // 3px borders for clear separation
+                    borderColor: '#ffffff',
+                    borderWidth: 3
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        display: false
-                    },
+                    legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: (context) => `${context.label}: ${context.parsed}%`
+                            label: (context) => context.label + ': ' + context.parsed + '%'
                         }
                     }
                 }
             }
         });
         
-        // Update legend
+        // Add legend below chart
         if (legendDiv) {
-            legendDiv.innerHTML = labels.map((label, idx) => `
-                <div class="legend-item">
-                    <div class="legend-color" style="background: ${backgroundColors[idx]};"></div>
-                    <div class="legend-label">${label}</div>
-                    <div class="legend-value">${data[idx]}%</div>
-                </div>
-            `).join('');
+            legendDiv.innerHTML = labels.map((label, idx) => 
+                '<div class="chart-legend-item">' +
+                    '<div class="legend-color" style="background: ' + backgroundColors[idx] + ';"></div>' +
+                    '<span class="legend-label">' + label + '</span>' +
+                    '<span class="legend-value">' + data[idx] + '%</span>' +
+                '</div>'
+            ).join('');
         }
     }
 
+    
     function updateOverallRisk(riskLevel, concentration) {
         const badge = document.getElementById('overallRiskBadge');
         if (!badge) return;
@@ -2728,22 +2801,24 @@
             </div>
             
             <div class="modal-body">
-                <table class="underlying-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 15%;">Symbol</th>
-                            <th style="width: 35%;">Name</th>
-                            <th style="width: 15%;">Weight</th>
-                            <th style="width: 20%;">Est. Value</th>
-                            <th style="width: 15%;">Sector</th>
-                            <th style="width: 13%;">Country</th>
-                            <th style="width: 15%;">Overlap</th>
-                        </tr>
-                    </thead>
-                    <tbody id="underlyingTableBody">
-                        <!-- Populated by JavaScript -->
-                    </tbody>
-                </table>
+                <div class="underlying-table-wrapper">
+                    <table class="underlying-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 15%;">Symbol</th>
+                                <th style="width: 35%;">Name</th>
+                                <th style="width: 15%;">Weight</th>
+                                <th style="width: 20%;">Est. Value</th>
+                                <th style="width: 15%;">Sector</th>
+                                <th style="width: 13%;">Country</th>
+                                <th style="width: 15%;">Overlap</th>
+                            </tr>
+                        </thead>
+                        <tbody id="underlyingTableBody">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
                 
                 <div id="underlyingEmpty" class="underlying-empty" style="display: none;">
                     <i class="fas fa-search"></i>

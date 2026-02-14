@@ -270,13 +270,17 @@ def register_routes(app):
                         u_symbol = underlying.get('symbol')
                         u_name = underlying.get('name', u_symbol)
                         u_weight = underlying.get('weight', 0)
+                        u_sector = underlying.get('sector', 'Unknown')
+                        u_country = underlying.get('country', 'Unknown')
                         
                         if u_symbol not in underlying_aggregated:
                             underlying_aggregated[u_symbol] = {
                                 'symbol': u_symbol,
                                 'name': u_name,
                                 'weight': 0,
-                                'value': 0
+                                'value': 0,
+                                'sector': u_sector,
+                                'country': u_country
                             }
                         
                         # Weight is already a decimal (e.g., 0.072 for 7.2%)

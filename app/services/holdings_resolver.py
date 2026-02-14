@@ -1,13 +1,12 @@
 """
-Holdings Resolver Service - FINAL FIX
+Holdings Resolver - FIXED for mstarpy 8.0.3
 
-The fix: Write directly to holding.underlying_holdings (TEXT column)
-instead of using the property holding.underlying_holdings_list
+Uses screener_universe() to search for US funds specifically
 """
 import logging
 from typing import List, Dict, Optional
 from decimal import Decimal
-import mstarpy
+import mstarpy as ms
 import pandas as pd
 import json
 
@@ -20,17 +19,102 @@ class HoldingsResolver:
     def __init__(self):
         pass
     
+    def _search_us_fund(self, symbol: str) -> Optional[Dict]:
+        """
+        Search for US-domiciled fund using screener_universe
+        STRICT: Only returns funds on US exchanges
+        """
+        symbol = symbol.upper().strip()
+        us_exchanges = ["ARCX", "XNAS", "XNYS", "BATS", "NYSE", "NASDAQ"]
+        
+        for inv_type, type_name in [("FE", "ETF"), ("FO", "Mutual Fund")]:
+            try:
+                results = ms.screener_universe(
+                    symbol,
+                    language="en-gb",
+                    field=["name", "ticker", "exchange", "isin", "investmentType"],
+                    filters={"investmentType": inv_type},
+                    pageSize=100
+                )
+                
+                if results:
+                    # Collect ALL ticker matches
+                    matches = []
+                    for result in results:
+                        meta = result.get("meta", {})
+                        fields = result.get("fields", {})
+                        
+                        ticker = meta.get("ticker", "") or ""
+                        exchange = meta.get("exchange", "") or ""
+                        
+                        if ticker.upper() == symbol:
+                            matches.append({
+                                "securityID": meta.get("securityID"),
+                                "ticker": ticker,
+                                "name": fields.get("name", {}).get("value", "Unknown"),
+                                "exchange": exchange,
+                                "type": type_name
+                            })
+                    
+                    if matches:
+                        logger.info(f"  Found {len(matches)} matches for {symbol} as {type_name}")
+                        for match in matches:
+                            logger.info(f"    - {match['name']} ({match['exchange']})")
+                        
+                        # CRITICAL: Pick FIRST US exchange match ONLY
+                        for match in matches:
+                            if match['exchange'] in us_exchanges:
+                                logger.info(f"  ✓ Selected US exchange: {match['exchange']}")
+                                return match
+                        
+                        logger.warning(f"  No US exchange found for {symbol} (found {[m['exchange'] for m in matches]})")
+            
+            except Exception as e:
+                logger.warning(f"Error searching {type_name} for {symbol}: {e}")
+                continue
+        
+        return None
+    
     def resolve_holding(self, symbol: str, asset_type: str, total_value: Decimal) -> Optional[List[Dict]]:
-        """Resolve underlying holdings for an ETF or Mutual Fund"""
+        """
+        Resolve underlying holdings for an ETF or Mutual Fund
+        
+        Args:
+            symbol: Ticker symbol (e.g., 'VTI', 'POGAX')
+            asset_type: Type of asset ('etf' or 'mutual_fund')
+            total_value: Total value of the holding
+            
+        Returns:
+            List of dicts with underlying holdings, or None if failed
+        """
         if asset_type not in ['etf', 'mutual_fund']:
-            logger.debug(f"Skipping {symbol} - not an ETF or mutual fund (type: {asset_type})")
+            logger.debug(f"Skipping {symbol} - not an ETF or mutual fund")
             return None
         
         logger.info(f"Resolving underlying holdings for {symbol} ({asset_type})...")
         
         try:
-            fund = mstarpy.Funds(term=symbol, pageSize=1)
-            holdings_df = fund.holdings()
+            # STEP 1: Search for the fund to get security ID
+            logger.info(f"  Searching for US fund: {symbol}")
+            fund_info = self._search_us_fund(symbol)
+            
+            if not fund_info:
+                logger.warning(f"No US fund found for {symbol}")
+                return None
+            
+            sec_id = fund_info["securityID"]
+            fund_name = fund_info["name"]
+            exchange = fund_info["exchange"]
+            
+            logger.info(f"  Found: {fund_name} ({exchange}) - SecID: {sec_id}")
+            
+            # STEP 2: Get holdings using security ID
+            fund = ms.Funds(sec_id)
+            holdings_df = fund.holdings(holdingType="equity")
+            
+            if holdings_df is None or holdings_df.empty:
+                # Try all holdings if equity is empty
+                holdings_df = fund.holdings()
             
             if holdings_df is None or holdings_df.empty:
                 logger.warning(f"No holdings data found for {symbol}")
@@ -38,6 +122,24 @@ class HoldingsResolver:
             
             logger.info(f"Found {len(holdings_df)} holdings for {symbol}")
             
+            # STEP 3: Validate holdings look like US stocks
+            sample_tickers = []
+            for idx, row in holdings_df.head(10).iterrows():
+                if 'ticker' in row and pd.notna(row['ticker']):
+                    ticker = str(row['ticker']).strip().upper()
+                    sample_tickers.append(ticker)
+            
+            # US stock tickers are typically 1-5 uppercase letters
+            if sample_tickers:
+                invalid_count = sum(1 for t in sample_tickers if not t.isalpha() or len(t) > 5)
+                
+                if invalid_count > len(sample_tickers) / 2:
+                    logger.warning(f"Holdings don't look like US stocks: {sample_tickers[:5]}")
+                    logger.warning(f"This may be an international fund")
+                
+                logger.info(f"Sample holdings: {sample_tickers[:5]}")
+            
+            # STEP 4: Process holdings DataFrame
             underlying = []
             
             for idx, row in holdings_df.iterrows():
@@ -145,11 +247,7 @@ def fetch_stock_info_for_holding(holding) -> bool:
 
 
 def fetch_sector_info_for_underlying_holdings(holding) -> int:
-    """
-    Fetch sector/geography info for all underlying holdings of an ETF/MF
-    
-    CRITICAL FIX: Writes directly to holding.underlying_holdings (TEXT column)
-    """
+    """Fetch sector/geography info for all underlying holdings"""
     from app.services.stock_info_service import get_stock_info
     
     if not holding.underlying_holdings_list:
@@ -157,7 +255,6 @@ def fetch_sector_info_for_underlying_holdings(holding) -> int:
         return 0
     
     try:
-        # Get the list (creates a copy)
         underlying_list = holding.underlying_holdings_list
         total_underlying = len(underlying_list)
         
@@ -170,7 +267,7 @@ def fetch_sector_info_for_underlying_holdings(holding) -> int:
         
         for idx, underlying in enumerate(underlying_list, 1):
             if 'sector' in underlying and underlying.get('sector') not in [None, 'Unknown', '', 'NOT SET']:
-                logger.debug(f"  [{idx}/{total_underlying}] {underlying['symbol']} - sector already exists: {underlying.get('sector')}")
+                logger.debug(f"  [{idx}/{total_underlying}] {underlying['symbol']} - already has sector")
                 enriched_count += 1
                 skipped_count += 1
                 continue
@@ -194,7 +291,7 @@ def fetch_sector_info_for_underlying_holdings(holding) -> int:
                 underlying['country'] = 'Unknown'
                 underlying['geography'] = 'Unknown'
         
-        # CRITICAL FIX: Write directly to the TEXT column
+        # CRITICAL: Write directly to TEXT column
         holding.underlying_holdings = json.dumps(underlying_list)
         
         logger.info(f"=" * 80)
