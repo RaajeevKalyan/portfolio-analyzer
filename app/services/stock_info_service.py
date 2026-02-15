@@ -2,11 +2,20 @@
 Stock Info Service using yfinance 1.1.0
 
 Replaces mstarpy with yfinance for reliable sector/country data.
+
+CHANGELOG:
+- Added: International ticker format support (Issue #3)
+- Added: Ticker suffix handling for non-US exchanges (.T, .L, .DE, etc.)
+- Added: Better logging for debugging data saves
+- Added: More geography mappings for international stocks
+- Improved: Error handling and fallback logic
+
 Features:
 - 2 second delay between requests
 - Persistent cache to avoid re-fetching
 - Rate limit: 2000 requests/hour (33/minute)
 - Progress tracking for UI
+- International ticker support
 """
 import logging
 import yfinance as yf
@@ -29,24 +38,97 @@ MIN_DELAY_SECONDS = 2.0  # 2 seconds between requests
 class StockInfoService:
     """Service to fetch stock information from Yahoo Finance via yfinance"""
     
-    # Geography mappings
-    US_COUNTRIES = {'United States', 'USA', 'US'}
+    # Geography mappings - expanded for international support
+    US_COUNTRIES = {'United States', 'USA', 'US', 'United States of America'}
     
     DEVELOPED_INTERNATIONAL = {
-        'United Kingdom', 'Japan', 'Germany', 'France', 'Canada',
-        'Australia', 'Switzerland', 'Netherlands', 'Sweden', 'Norway',
-        'Denmark', 'Finland', 'Belgium', 'Austria', 'Ireland', 'Spain',
-        'Italy', 'Portugal', 'Singapore', 'Hong Kong', 'New Zealand',
-        'UK', 'GBR', 'CAN', 'AUS', 'JPN', 'DEU', 'FRA', 'CHE', 'NLD',
-        'Korea, Republic of', 'South Korea'
+        # Europe
+        'United Kingdom', 'UK', 'Great Britain', 'GBR',
+        'Germany', 'DEU', 'Federal Republic of Germany',
+        'France', 'FRA',
+        'Switzerland', 'CHE',
+        'Netherlands', 'NLD',
+        'Sweden', 'SWE',
+        'Norway', 'NOR',
+        'Denmark', 'DNK',
+        'Finland', 'FIN',
+        'Belgium', 'BEL',
+        'Austria', 'AUT',
+        'Ireland', 'IRL',
+        'Spain', 'ESP',
+        'Italy', 'ITA',
+        'Portugal', 'PRT',
+        'Luxembourg', 'LUX',
+        # Asia-Pacific Developed
+        'Japan', 'JPN',
+        'Australia', 'AUS',
+        'Singapore', 'SGP',
+        'Hong Kong', 'HKG',
+        'New Zealand', 'NZL',
+        'South Korea', 'Korea, Republic of', 'KOR',
+        # North America (non-US)
+        'Canada', 'CAN',
+        # Israel
+        'Israel', 'ISR',
     }
     
     EMERGING_MARKETS = {
-        'China', 'India', 'Brazil', 'Russia', 'Taiwan',
-        'Mexico', 'Indonesia', 'Turkey', 'Saudi Arabia', 'South Africa',
-        'Thailand', 'Malaysia', 'Poland', 'Chile', 'Philippines', 'Egypt',
-        'United Arab Emirates', 'Colombia', 'Peru', 'Czech Republic',
-        'CHN', 'IND', 'BRA', 'RUS', 'KOR', 'TWN', 'MEX', 'IDN', 'TUR'
+        # Asia
+        'China', 'CHN', "People's Republic of China",
+        'India', 'IND',
+        'Taiwan', 'TWN',
+        'Indonesia', 'IDN',
+        'Thailand', 'THA',
+        'Malaysia', 'MYS',
+        'Philippines', 'PHL',
+        'Vietnam', 'VNM',
+        # Latin America
+        'Brazil', 'BRA',
+        'Mexico', 'MEX',
+        'Chile', 'CHL',
+        'Colombia', 'COL',
+        'Peru', 'PER',
+        'Argentina', 'ARG',
+        # Europe/Middle East/Africa
+        'Russia', 'RUS', 'Russian Federation',
+        'Turkey', 'TUR',
+        'Poland', 'POL',
+        'Czech Republic', 'CZE', 'Czechia',
+        'Hungary', 'HUN',
+        'South Africa', 'ZAF',
+        'Saudi Arabia', 'SAU',
+        'United Arab Emirates', 'ARE', 'UAE',
+        'Qatar', 'QAT',
+        'Egypt', 'EGY',
+        'Kuwait', 'KWT',
+    }
+    
+    # International ticker suffix to country mapping
+    # Used to infer country when yfinance doesn't return it
+    TICKER_SUFFIX_COUNTRY = {
+        '.T': 'Japan',           # Tokyo
+        '.L': 'United Kingdom',   # London
+        '.DE': 'Germany',         # Deutsche Börse
+        '.PA': 'France',          # Paris
+        '.AS': 'Netherlands',     # Amsterdam
+        '.SW': 'Switzerland',     # Swiss
+        '.MI': 'Italy',           # Milan
+        '.MC': 'Spain',           # Madrid
+        '.HK': 'Hong Kong',       # Hong Kong
+        '.SS': 'China',           # Shanghai
+        '.SZ': 'China',           # Shenzhen
+        '.TW': 'Taiwan',          # Taiwan
+        '.KS': 'South Korea',     # Korea
+        '.AX': 'Australia',       # Australia
+        '.TO': 'Canada',          # Toronto
+        '.SI': 'Singapore',       # Singapore
+        '.NS': 'India',           # NSE India
+        '.BO': 'India',           # BSE India
+        '.SA': 'Brazil',          # São Paulo
+        '.MX': 'Mexico',          # Mexico
+        '.JK': 'Indonesia',       # Jakarta
+        '.BK': 'Thailand',        # Bangkok
+        '.KL': 'Malaysia',        # Kuala Lumpur
     }
     
     def __init__(self):
@@ -109,16 +191,66 @@ class StockInfoService:
         
         self.last_request_time = time.time()
     
+    def _normalize_ticker(self, symbol: str) -> str:
+        """
+        Normalize ticker symbol for yfinance lookup
+        
+        Handles international ticker formats and common variations.
+        
+        Args:
+            symbol: Raw ticker symbol
+            
+        Returns:
+            Normalized ticker suitable for yfinance
+        """
+        if not symbol:
+            return symbol
+        
+        symbol = symbol.strip().upper()
+        
+        # Already has a suffix, keep as-is
+        if '.' in symbol:
+            return symbol
+        
+        # Some international stocks need suffixes added
+        # This is a heuristic - yfinance is usually smart enough to find them
+        
+        return symbol
+    
+    def _infer_country_from_ticker(self, symbol: str) -> Optional[str]:
+        """
+        Infer country from ticker suffix if present
+        
+        Args:
+            symbol: Ticker symbol
+            
+        Returns:
+            Country name or None
+        """
+        if not symbol or '.' not in symbol:
+            return None
+        
+        for suffix, country in self.TICKER_SUFFIX_COUNTRY.items():
+            if symbol.upper().endswith(suffix):
+                return country
+        
+        return None
+    
     def get_stock_info(self, symbol: str) -> Optional[Dict]:
         """
         Fetch stock information from Yahoo Finance
         
+        Handles both US and international tickers.
+        
         Args:
-            symbol: Stock ticker symbol
+            symbol: Stock ticker symbol (US or international)
             
         Returns:
             Dict with sector, industry, country, geography or None if failed
         """
+        # Normalize symbol
+        symbol = self._normalize_ticker(symbol)
+        
         # Check cache first (in-memory and persistent)
         if symbol in self.cache:
             logger.debug(f"Using cached info for {symbol}")
@@ -141,12 +273,37 @@ class StockInfoService:
             
             if not info or len(info) == 0:
                 logger.warning(f"No info returned for {symbol}")
+                # Try to infer country from ticker suffix
+                inferred_country = self._infer_country_from_ticker(symbol)
+                if inferred_country:
+                    result = {
+                        'sector': 'Unknown',
+                        'industry': 'Unknown',
+                        'country': inferred_country,
+                        'geography': self._map_country_to_geography(inferred_country)
+                    }
+                    self.cache[symbol] = result
+                    self._save_cache()
+                    logger.info(f"Inferred country for {symbol} from ticker: {inferred_country}")
+                    return result
                 return self._get_placeholder_data()
             
-            # Extract relevant fields (stocks have these, funds may not)
-            sector = info.get('sector', info.get('category', 'Unknown'))
+            # Extract relevant fields
+            # For stocks: sector, industry, country are direct fields
+            # For funds/ETFs: may have 'category' instead of 'sector'
+            sector = info.get('sector')
+            if not sector or sector == 'Unknown':
+                sector = info.get('category', 'Unknown')
+            
             industry = info.get('industry', 'Unknown')
             country = info.get('country', 'Unknown')
+            
+            # If country not found, try to infer from ticker suffix
+            if country == 'Unknown' or not country:
+                inferred_country = self._infer_country_from_ticker(symbol)
+                if inferred_country:
+                    country = inferred_country
+                    logger.debug(f"Inferred country for {symbol} from ticker: {country}")
             
             # Clean up values
             sector = str(sector).strip() if sector and sector != 'Unknown' else 'Unknown'
@@ -167,11 +324,26 @@ class StockInfoService:
             self.cache[symbol] = result
             self._save_cache()
             
-            logger.info(f"✓ Info for {symbol}: {sector} / {country}")
+            logger.info(f"✓ Info for {symbol}: {sector} / {country} / {geography}")
             return result
             
         except Exception as e:
             logger.error(f"Error fetching info for {symbol}: {e}")
+            
+            # Try to infer country from ticker suffix as fallback
+            inferred_country = self._infer_country_from_ticker(symbol)
+            if inferred_country:
+                result = {
+                    'sector': 'Unknown',
+                    'industry': 'Unknown',
+                    'country': inferred_country,
+                    'geography': self._map_country_to_geography(inferred_country)
+                }
+                self.cache[symbol] = result
+                self._save_cache()
+                logger.info(f"Fallback: inferred country for {symbol} from ticker: {inferred_country}")
+                return result
+            
             # Return placeholder instead of None to avoid blocking
             return self._get_placeholder_data()
     
@@ -197,15 +369,25 @@ class StockInfoService:
         if not country or country == 'Unknown':
             return 'Unknown'
         
-        if country in self.US_COUNTRIES or 'United States' in country:
+        # Normalize for comparison
+        country_normalized = country.strip()
+        
+        # Check US
+        if country_normalized in self.US_COUNTRIES or 'United States' in country_normalized:
             return 'US'
-        elif country in self.DEVELOPED_INTERNATIONAL:
+        
+        # Check Developed International
+        if country_normalized in self.DEVELOPED_INTERNATIONAL:
             return 'International Developed'
-        elif country in self.EMERGING_MARKETS:
+        
+        # Check Emerging Markets
+        if country_normalized in self.EMERGING_MARKETS:
             return 'Emerging Markets'
-        else:
-            logger.debug(f"Unknown country: {country}, defaulting to International Developed")
-            return 'International Developed'
+        
+        # Default to International Developed for unknown countries
+        # (Most stocks in global indices are from developed markets)
+        logger.debug(f"Unknown country '{country}', defaulting to International Developed")
+        return 'International Developed'
     
     def get_progress_stats(self) -> Dict:
         """
@@ -224,6 +406,17 @@ class StockInfoService:
             'time_in_window_seconds': time_in_window,
             'delay_between_requests': MIN_DELAY_SECONDS
         }
+    
+    def clear_cache(self):
+        """Clear the cache (useful for debugging)"""
+        self.cache = {}
+        if CACHE_FILE.exists():
+            CACHE_FILE.unlink()
+        logger.info("Cache cleared")
+    
+    def get_cached_symbols(self) -> list:
+        """Get list of all cached symbols"""
+        return list(self.cache.keys())
 
 
 # Global instance to maintain cache and rate limiting across calls
@@ -258,3 +451,13 @@ def get_progress_stats() -> Dict:
         _global_service = StockInfoService()
     
     return _global_service.get_progress_stats()
+
+
+def clear_cache():
+    """Clear the stock info cache"""
+    global _global_service
+    
+    if _global_service is None:
+        _global_service = StockInfoService()
+    
+    _global_service.clear_cache()

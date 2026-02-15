@@ -12,6 +12,10 @@ Expected CSV format (common columns):
 - Account (optional)
 
 Note: Merrill Lynch CSV formats can vary. This parser handles common variations.
+
+CHANGELOG:
+- Fixed: Cash holdings are now properly parsed instead of being filtered out
+- Fixed: Cash rows without symbols are now handled correctly
 """
 from app.services.csv_parser_base import CSVParserBase
 import pandas as pd
@@ -81,6 +85,8 @@ class MerrillCSVParser(CSVParserBase):
         4. Data rows
         5. Footer with totals (skip)
         
+        IMPORTANT: We now KEEP cash rows instead of filtering them out.
+        
         Returns:
             pd.DataFrame: Extracted data or None
         """
@@ -104,14 +110,17 @@ class MerrillCSVParser(CSVParserBase):
                 logger.error("Could not find data section with Symbol/Description/Quantity columns")
                 return None
             
-            # Find where data ends (look for "Balances", "Total", or empty lines)
+            # Find where data ends (look for footer markers like "Total" at start of line)
             data_end_idx = len(lines)
             for i in range(data_start_idx, len(lines)):
                 line_content = lines[i].strip().strip('"').strip()
-                # Stop at footer markers
-                if any(marker in line_content for marker in ['Balances', 'Total', 'Cash balance', 'Money accounts']):
+                
+                # Stop at footer markers that indicate end of holdings data
+                # Be more specific: only stop if line STARTS with these markers
+                if line_content.startswith('Total') or line_content.startswith('Balances'):
                     data_end_idx = i
                     break
+                    
                 # Stop at empty lines after data
                 if line_content == '' or line_content == ',':
                     # Check if this is truly the end (no more data after)
@@ -129,6 +138,7 @@ class MerrillCSVParser(CSVParserBase):
             data_lines = lines[data_start_idx:data_end_idx]
             
             # Filter out empty lines and lines that are just commas
+            # BUT keep cash-related lines
             data_lines = [line for line in data_lines if line.strip() and line.strip() != ',' and line.strip() != '""']
             
             # Combine into CSV content
@@ -153,10 +163,12 @@ class MerrillCSVParser(CSVParserBase):
             # Remove any empty rows
             df = df.dropna(how='all')
             
-            # Filter out rows where Symbol is empty or contains footer keywords
+            # Filter out ONLY true footer rows (Total, Pending transactions, etc.)
+            # IMPORTANT: We NO LONGER filter out Cash/Money rows
             if 'Symbol' in df.columns:
                 df = df[df['Symbol'].notna()]
-                df = df[~df['Symbol'].str.contains('Balances|Total|Cash|Money|Pending', case=False, na=False)]
+                # Only filter out summary/footer rows, NOT cash holdings
+                df = df[~df['Symbol'].str.contains('^Total$|^Pending|^Balances$', case=False, na=False, regex=True)]
             
             logger.info(f"Extracted Merrill data section: {len(df)} rows, {len(df.columns)} columns")
             logger.debug(f"Columns: {list(df.columns)}")
@@ -207,7 +219,9 @@ class MerrillCSVParser(CSVParserBase):
             dict: {
                 'account_number_last4': str,
                 'total_value': Decimal,
-                'holdings': List[Dict]
+                'holdings': List[Dict],
+                'cash_holdings': List[Dict],  # NEW: Separate list for cash
+                'total_cash': Decimal  # NEW: Total cash value
             }
         """
         # Preprocess and load CSV
@@ -227,24 +241,38 @@ class MerrillCSVParser(CSVParserBase):
         
         # Parse holdings
         holdings = []
+        cash_holdings = []
         total_value = Decimal('0.00')
+        total_cash = Decimal('0.00')
         
         for idx, row in df.iterrows():
             try:
                 holding = self._parse_row(row, columns)
                 if holding and holding['total_value'] > 0:
-                    holdings.append(holding)
+                    if holding['asset_type'] == 'cash':
+                        cash_holdings.append(holding)
+                        total_cash += holding['total_value']
+                    else:
+                        holdings.append(holding)
                     total_value += holding['total_value']
             except Exception as e:
                 logger.warning(f"Error parsing row {idx}: {e}")
                 continue
         
-        logger.info(f"Parsed {len(holdings)} holdings, total value: ${total_value}")
+        logger.info(f"Parsed {len(holdings)} investment holdings and {len(cash_holdings)} cash holdings")
+        logger.info(f"Total value: ${total_value}, Cash: ${total_cash}")
+        
+        # Combine all holdings for storage (but mark cash separately)
+        all_holdings = holdings + cash_holdings
         
         return {
             'account_number_last4': account_number,
             'total_value': total_value,
-            'holdings': holdings
+            'holdings': all_holdings,
+            'cash_holdings': cash_holdings,
+            'total_cash': total_cash,
+            'investment_holdings': holdings,
+            'total_investments': total_value - total_cash
         }
     
     def _map_columns(self, df: pd.DataFrame) -> Optional[Dict[str, str]]:
@@ -300,9 +328,23 @@ class MerrillCSVParser(CSVParserBase):
             dict: Holding data or None if invalid
         """
         # Extract symbol
-        symbol = self.normalize_symbol(row[columns['symbol']])
+        symbol_raw = row[columns['symbol']]
+        symbol = self.normalize_symbol(symbol_raw)
+        
+        # Extract description for cash detection
+        description = ''
+        if columns.get('description') and not pd.isna(row[columns['description']]):
+            description = str(row[columns['description']]).strip()
+        
+        # Check if this is a cash holding BEFORE rejecting empty symbols
+        is_cash = self._is_cash_holding(symbol, description)
+        
         if not symbol or symbol == '' or symbol == 'N/A':
-            return None
+            if is_cash:
+                # Generate a synthetic symbol for cash
+                symbol = 'CASH'
+            else:
+                return None
         
         # Extract quantity
         quantity_str = str(row[columns['quantity']])
@@ -312,8 +354,13 @@ class MerrillCSVParser(CSVParserBase):
         else:
             quantity = self.clean_quantity(quantity_str)
         
-        if quantity == 0:
+        # For cash, quantity might be 0 or 1 - that's okay
+        if quantity == 0 and not is_cash:
             return None
+        
+        # For cash with 0 quantity, set to 1
+        if quantity == 0 and is_cash:
+            quantity = Decimal('1.00')
         
         # Extract total value
         value_str = str(row[columns['value']])
@@ -333,8 +380,13 @@ class MerrillCSVParser(CSVParserBase):
         # Calculate price
         price = total_value / quantity if quantity != 0 else Decimal('0.00')
         
-        # If price column exists, try to use it
-        if columns.get('price') and not pd.isna(row[columns['price']]):
+        # For cash, price equals value (1 unit)
+        if is_cash:
+            price = total_value
+            quantity = Decimal('1.00')
+        
+        # If price column exists, try to use it (but not for cash)
+        if not is_cash and columns.get('price') and not pd.isna(row[columns['price']]):
             price_str = str(row[columns['price']])
             price_match = re.search(r'[\d,.]+', price_str)
             if price_match:
@@ -343,13 +395,11 @@ class MerrillCSVParser(CSVParserBase):
                     price = price_from_col
                     total_value = price * quantity
         
-        # Extract description
-        description = ''
-        if columns.get('description') and not pd.isna(row[columns['description']]):
-            description = str(row[columns['description']]).strip()
-        
         # Detect asset type
-        asset_type = self.detect_asset_type(symbol, description)
+        if is_cash:
+            asset_type = 'cash'
+        else:
+            asset_type = self.detect_asset_type(symbol, description)
         
         # Extract account type
         account_type = None
@@ -373,6 +423,33 @@ class MerrillCSVParser(CSVParserBase):
             'asset_type': asset_type,
             'account_type': account_type
         }
+    
+    def _is_cash_holding(self, symbol: str, description: str) -> bool:
+        """
+        Determine if a row represents a cash holding
+        
+        Args:
+            symbol: The symbol (may be empty for cash)
+            description: The description field
+            
+        Returns:
+            bool: True if this is a cash holding
+        """
+        symbol_upper = symbol.upper() if symbol else ''
+        desc_upper = description.upper() if description else ''
+        
+        # Cash keywords
+        cash_keywords = [
+            'CASH', 'MONEY MARKET', 'SWEEP', 'SETTLEMENT', 'CORE',
+            'FDIC', 'BANK DEPOSIT', 'CASH BALANCE', 'AVAILABLE CASH',
+            'UNINVESTED', 'PENDING'
+        ]
+        
+        for keyword in cash_keywords:
+            if keyword in symbol_upper or keyword in desc_upper:
+                return True
+        
+        return False
     
     def get_required_columns(self) -> List[str]:
         """Get list of possible required columns"""

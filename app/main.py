@@ -1,12 +1,18 @@
 """
 Flask Application Entry Point
+
+CHANGELOG:
+- Added: Cash vs Investment breakdown data passed to dashboard
+- Added: Asset type breakdown data
+- Improved: Resolution progress endpoint with more details
+- Added: Better logging for debugging
 """
 from flask import Flask, render_template, jsonify
 from app.config import get_config
 import logging
 from logging.handlers import RotatingFileHandler
 import os
-from app.services.holdings_aggregator import get_current_holdings
+from app.services.holdings_aggregator import get_current_holdings, get_cash_breakdown, get_asset_breakdown
 from app.database import db_session
 from app.models import BrokerAccount, PortfolioSnapshot, Holding
 from app.services.risk_aggregator import get_risk_metrics
@@ -23,10 +29,8 @@ def create_app():
     config = get_config()
     app.config.from_object(config)
 
-
     # Validate configuration
     config.validate()
-
 
     # Setup logging
     setup_logging(app)
@@ -165,13 +169,27 @@ def register_routes(app):
             
             print(f"Total net worth: ${total_net_worth}", file=sys.stderr)
             
-            # Get aggregated holdings
+            # Get aggregated holdings (includes cash breakdown)
             print("Getting holdings...", file=sys.stderr)
             holdings_data = get_current_holdings()
             holdings = holdings_data.get('holdings', [])
-            print(f"Got {len(holdings)} holdings", file=sys.stderr)
             
-            # NEW: Get risk metrics
+            # Extract cash vs investment data
+            total_cash = float(holdings_data.get('total_cash', 0))
+            total_investments = float(holdings_data.get('total_investments', total_net_worth))
+            cash_percentage = holdings_data.get('cash_percentage', 0)
+            investment_percentage = holdings_data.get('investment_percentage', 100)
+            
+            print(f"Got {len(holdings)} holdings", file=sys.stderr)
+            print(f"Investments: ${total_investments} ({investment_percentage:.1f}%)", file=sys.stderr)
+            print(f"Cash: ${total_cash} ({cash_percentage:.1f}%)", file=sys.stderr)
+            
+            # Get asset type breakdown
+            print("Getting asset breakdown...", file=sys.stderr)
+            asset_breakdown = get_asset_breakdown()
+            print(f"Asset breakdown: {len(asset_breakdown.get('breakdown', []))} types", file=sys.stderr)
+            
+            # Get risk metrics
             print("Getting risk metrics...", file=sys.stderr)
             risk_metrics = get_risk_metrics()
             print(f"Risk metrics calculated: {risk_metrics.get('overall_risk')} risk", file=sys.stderr)
@@ -181,6 +199,14 @@ def register_routes(app):
                                     brokers=brokers_data,
                                     total_net_worth=total_net_worth,
                                     holdings=holdings,
+                                    # Cash breakdown data
+                                    total_cash=total_cash,
+                                    total_investments=total_investments,
+                                    cash_percentage=cash_percentage,
+                                    investment_percentage=investment_percentage,
+                                    # Asset breakdown for charts
+                                    asset_breakdown=asset_breakdown,
+                                    # Risk metrics
                                     risk_metrics=risk_metrics)
             print("Template rendered successfully!", file=sys.stderr)
             return result
@@ -219,8 +245,9 @@ def register_routes(app):
             if not target_holding:
                 return jsonify({'error': 'Symbol not found'}), 404
             
-            # Get direct holdings (to detect overlaps)
-            direct_symbols = [h['symbol'] for h in all_holdings if not h['is_etf_or_mf']]
+            # Get direct holdings (to detect overlaps) - exclude cash
+            direct_symbols = [h['symbol'] for h in all_holdings 
+                            if not h['is_etf_or_mf'] and h['asset_type'] != 'cash']
             
             # Fetch underlying holdings from database
             with db_session() as session:
@@ -322,14 +349,19 @@ def register_routes(app):
         - cached_symbols: int
         - requests_this_hour: int
         - rate_limit: int
+        - unresolved_count: int
+        - etf_mf_unresolved: int
+        - current_symbol: str (if currently processing)
         """
         try:
             from app.services.stock_info_service import get_progress_stats
-            from app.database import db_session
-            from app.models import Holding
+            from app.services.resolution_tracker import get_resolution_status
             
             # Get stock info progress stats
             stats = get_progress_stats()
+            
+            # Get resolution tracker status
+            resolution_status = get_resolution_status()
             
             # Check if any holdings still need sector info
             with db_session() as session:
@@ -341,24 +373,93 @@ def register_routes(app):
                     Holding.asset_type.in_(['etf', 'mutual_fund']),
                     Holding.underlying_parsed == False
                 ).count()
+                
+                # Get total holdings for percentage calculation
+                total_holdings = session.query(Holding).count()
+                resolved_holdings = session.query(Holding).filter(
+                    Holding.info_fetched == True
+                ).count()
             
-            is_resolving = (unresolved > 0) or (etf_mf_unresolved > 0)
+            is_resolving = resolution_status.get('is_running', False) or (unresolved > 0) or (etf_mf_unresolved > 0)
+            
+            # Calculate progress percentage
+            progress_pct = (resolved_holdings / total_holdings * 100) if total_holdings > 0 else 100
             
             return jsonify({
                 'is_resolving': is_resolving,
                 'unresolved_count': unresolved,
                 'etf_mf_unresolved': etf_mf_unresolved,
+                'total_holdings': total_holdings,
+                'resolved_holdings': resolved_holdings,
+                'progress_percentage': round(progress_pct, 1),
                 'cached_symbols': stats.get('cached_symbols', 0),
                 'requests_this_hour': stats.get('requests_this_hour', 0),
-                'rate_limit': stats.get('rate_limit', 2000)
+                'rate_limit': stats.get('rate_limit', 2000),
+                'current_symbol': resolution_status.get('current_symbol', None),
+                'current_step': resolution_status.get('current_step', None),
+                'started_at': resolution_status.get('started_at', None),
+                'last_update': resolution_status.get('last_update', None)
             })
             
+        except ImportError:
+            # Resolution tracker not yet available, fall back to basic check
+            try:
+                from app.services.stock_info_service import get_progress_stats
+                stats = get_progress_stats()
+                
+                with db_session() as session:
+                    unresolved = session.query(Holding).filter(
+                        Holding.info_fetched == False
+                    ).count()
+                    
+                    etf_mf_unresolved = session.query(Holding).filter(
+                        Holding.asset_type.in_(['etf', 'mutual_fund']),
+                        Holding.underlying_parsed == False
+                    ).count()
+                
+                is_resolving = (unresolved > 0) or (etf_mf_unresolved > 0)
+                
+                return jsonify({
+                    'is_resolving': is_resolving,
+                    'unresolved_count': unresolved,
+                    'etf_mf_unresolved': etf_mf_unresolved,
+                    'cached_symbols': stats.get('cached_symbols', 0),
+                    'requests_this_hour': stats.get('requests_this_hour', 0),
+                    'rate_limit': stats.get('rate_limit', 2000)
+                })
+            except Exception as e:
+                return jsonify({
+                    'is_resolving': False,
+                    'error': str(e)
+                }), 500
+                
         except Exception as e:
-            logger.error(f"Error getting resolution progress: {e}")
+            print(f"Error getting resolution progress: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             return jsonify({
                 'is_resolving': False,
                 'error': str(e)
             }), 500
+    
+    @app.route('/api/cash-breakdown')
+    def api_cash_breakdown():
+        """API endpoint for cash vs investments breakdown"""
+        try:
+            data = get_cash_breakdown()
+            return jsonify(data)
+        except Exception as e:
+            print(f"Error getting cash breakdown: {e}", file=sys.stderr)
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/asset-breakdown')
+    def api_asset_breakdown():
+        """API endpoint for asset type breakdown"""
+        try:
+            data = get_asset_breakdown()
+            return jsonify(data)
+        except Exception as e:
+            print(f"Error getting asset breakdown: {e}", file=sys.stderr)
+            return jsonify({'error': str(e)}), 500
 
 
 # Create application instance

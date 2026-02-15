@@ -118,11 +118,50 @@
         
         .net-worth-content {
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+
+        .net-worth-main {
+            display: flex;
             align-items: center;
             gap: 1rem;
         }
-        
+
+        .net-worth-breakdown {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .breakdown-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.15);
+            border-radius: 8px;
+        }
+
+        .breakdown-label {
+            font-size: 0.75rem;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .breakdown-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .breakdown-pct {
+            font-size: 0.8rem;
+            opacity: 0.85;
+        }        
+
         .net-worth-label {
             font-size: 0.9rem;
             opacity: 0.9;
@@ -721,22 +760,27 @@
             right: 0;
             bottom: 0;
             background: rgba(0, 0, 0, 0.5);
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             z-index: 9999;
             padding: 2rem;
+            overflow-y: auto;
+        }
+        .modal-overlay.show {
+            display: flex;
         }
 
         .modal-container {
             background: var(--bg-card);
             border-radius: 12px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 900px;
+            max-width: 1000px;
             width: 100%;
-            max-height: 90vh;
+            max-height: 85vh;
             display: flex;
             flex-direction: column;
+            margin: auto;
         }
 
         .modal-header {
@@ -864,7 +908,13 @@
         .modal-body {
             flex: 1;
             overflow-y: auto;
-            padding: 1rem 2rem;
+            padding: 0;
+            min-height: 300px;
+        }
+
+        .underlying-table-wrapper {
+            max-height: none;
+            overflow-y: visible;
         }
 
         .underlying-table {
@@ -1417,7 +1467,29 @@
             color: var(--text-muted);
             font-style: italic;
         }
-        
+
+        .progress-header .current-symbol {
+            margin-left: auto;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: normal;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
         /* end Progress Indicator */
         .sector-badge, .country-badge {
             font-size: 0.85rem;
@@ -1547,6 +1619,29 @@
         .underlying-table td {
             display: table-cell;
         }
+
+        /* Cash Badge styling */
+        .badge-cash {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 600;
+        }
+
+        /* Cash row styling */
+        .holdings-table tbody tr.holding-row.cash-row {
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .holdings-table tbody tr.holding-row.cash-row:hover {
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .allocation-bar-fill.cash {
+            background: linear-gradient(90deg, #10b981, #059669);
+        }
    
     </style>
 </head>
@@ -1574,8 +1669,24 @@
     <div class="net-worth-bar">
         <div class="container">
             <div class="net-worth-content">
-                <span class="net-worth-label">Total Net Worth:</span>
-                <span class="net-worth-value">${{ "{:,.2f}".format(total_net_worth) }}</span>
+                <div class="net-worth-main">
+                    <span class="net-worth-label">Total Net Worth:</span>
+                    <span class="net-worth-value">${{ "{:,.2f}".format(total_net_worth) }}</span>
+                </div>
+                
+                <!-- NEW: Cash vs Investment Breakdown -->
+                <div class="net-worth-breakdown">
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">Investments</span>
+                        <span class="breakdown-value">${{ "{:,.2f}".format(total_investments|default(total_net_worth)) }}</span>
+                        <span class="breakdown-pct">{{ "{:.1f}".format(investment_percentage|default(100)) }}%</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">Cash</span>
+                        <span class="breakdown-value">${{ "{:,.2f}".format(total_cash|default(0)) }}</span>
+                        <span class="breakdown-pct">{{ "{:.1f}".format(cash_percentage|default(0)) }}%</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1777,9 +1888,17 @@
                 <div class="progress-header">
                     <i class="fas fa-spinner fa-spin"></i>
                     <span>Resolving Holdings Data</span>
+                    <span class="current-symbol" id="currentSymbol"></span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
                 </div>
                 <div class="progress-body">
                     <div class="progress-stats">
+                        <div class="stat">
+                            <span class="stat-label">Progress:</span>
+                            <span class="stat-value" id="progressPercent">0%</span>
+                        </div>
                         <div class="stat">
                             <span class="stat-label">Cached Symbols:</span>
                             <span class="stat-value" id="cachedCount">0</span>
@@ -1788,13 +1907,17 @@
                             <span class="stat-label">API Requests (this hour):</span>
                             <span class="stat-value" id="requestCount">0 / 2000</span>
                         </div>
+                        <div class="stat">
+                            <span class="stat-label">Remaining:</span>
+                            <span class="stat-value" id="remainingCount">0</span>
+                        </div>
                     </div>
                     <div class="progress-message">
-                        <small>Fetching sector and country data... This may take a few minutes with 2-second delays between requests.</small>
+                        <small id="progressMessage">Fetching sector and country data... This may take a few minutes.</small>
                     </div>
                 </div>
             </div>
-        </div>        
+        </div>       
         
        <!-- Holdings Section -->
         <div class="holdings-section mt-5">
@@ -1831,7 +1954,7 @@
                     <tbody id="holdingsTableBody">
                         {% for holding in holdings %}
                         <!-- Main holding row -->
-                        <tr class="holding-row {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}expandable{% endif %}" 
+                        <tr class="holding-row {% if holding.asset_type == 'cash' %}cash-row{% endif %} {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}expandable{% endif %}" 
                             data-symbol="{{ holding.symbol }}"
                             data-asset-type="{{ holding.asset_type }}"
                             {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}onclick="toggleHoldingRow('{{ holding.symbol }}')"{% endif %}>
@@ -1842,7 +1965,9 @@
                                     <i class="fas fa-chevron-right expand-icon" id="icon-{{ holding.symbol }}"></i>
                                     {% endif %}
                                     <strong class="symbol-text">{{ holding.symbol }}</strong>
-                                    {% if holding.is_etf_or_mf %}
+                                    {% if holding.asset_type == 'cash' %}
+                                    <span class="badge badge-cash">CASH</span>
+                                    {% elif holding.is_etf_or_mf %}
                                     <span class="badge badge-fund">{{ holding.asset_type|upper }}</span>
                                     {% endif %}
                                 </div>
@@ -2160,7 +2285,6 @@
 
     async function viewUnderlying(symbol) {
         try {
-            // Fetch underlying holdings data for this symbol
             const response = await fetch(`/api/holdings/underlying/${symbol}`);
             
             if (!response.ok) {
@@ -2183,8 +2307,8 @@
             // Populate table
             renderUnderlyingTable(currentUnderlyingData);
             
-            // Show modal
-            document.getElementById('underlyingModal').style.display = 'flex';
+            // Show modal using class
+            document.getElementById('underlyingModal').classList.add('show');
             
             // Reset filters
             document.getElementById('underlyingSearch').value = '';
@@ -2192,8 +2316,15 @@
             
         } catch (error) {
             console.error('Error loading underlying holdings:', error);
-            alert('Failed to load underlying holdings. Please try again.');
+            showToast('Error', 'Failed to load underlying holdings. Please try again.', 'error');
         }
+    }
+
+    function closeUnderlyingModal(event) {
+        if (event && event.target !== event.currentTarget) {
+            return;
+        }
+        document.getElementById('underlyingModal').classList.remove('show');
     }
 
     function renderUnderlyingTable(holdings) {
@@ -2258,13 +2389,6 @@
         }
         
         renderUnderlyingTable(filtered);
-    }
-
-    function closeUnderlyingModal(event) {
-        if (event && event.target !== event.currentTarget) {
-            return; // Don't close if clicking inside modal
-        }
-        document.getElementById('underlyingModal').style.display = 'none';
     }
 
     function formatNumber(num) {
@@ -2697,16 +2821,42 @@
             .then(data => {
                 const progressDiv = document.getElementById('resolutionProgress');
                 
-                // Show progress indicator if still resolving
                 if (data.is_resolving) {
                     checkingProgress = true;
                     progressDiv.style.display = 'block';
+                    
+                    // Update all progress indicators
                     document.getElementById('cachedCount').textContent = data.cached_symbols || 0;
                     document.getElementById('requestCount').textContent = 
                         `${data.requests_this_hour || 0} / ${data.rate_limit || 2000}`;
+                    document.getElementById('remainingCount').textContent = data.unresolved_count || 0;
+                    
+                    // Update progress bar and percentage
+                    const progressPct = data.progress_percentage || 0;
+                    document.getElementById('progressPercent').textContent = `${progressPct}%`;
+                    document.getElementById('progressBarFill').style.width = `${progressPct}%`;
+                    
+                    // Update current symbol being processed
+                    if (data.current_symbol) {
+                        document.getElementById('currentSymbol').textContent = `Processing: ${data.current_symbol}`;
+                    } else {
+                        document.getElementById('currentSymbol').textContent = '';
+                    }
+                    
+                    // Update message based on current step
+                    const messageEl = document.getElementById('progressMessage');
+                    if (data.current_step === 'etf_resolution') {
+                        messageEl.textContent = 'Resolving ETF/Mutual Fund underlying holdings...';
+                    } else if (data.current_step === 'parent_info') {
+                        messageEl.textContent = 'Fetching sector and country data for holdings...';
+                    } else if (data.current_step === 'underlying_info') {
+                        messageEl.textContent = 'Enriching underlying holdings with sector data...';
+                    } else {
+                        messageEl.textContent = 'Processing holdings data...';
+                    }
+                    
                 } else {
                     progressDiv.style.display = 'none';
-                    // Stop checking if nothing is resolving
                     if (checkingProgress) {
                         checkingProgress = false;
                         if (progressInterval) {
@@ -2762,7 +2912,7 @@
      <!-- End script block for progress -->
 
     <!-- Underlying Holdings Modal -->
-    <div class="modal-overlay" id="underlyingModal" style="display: none;" onclick="closeUnderlyingModal(event)">
+    <div class="modal-overlay" id="underlyingModal" onclick="closeUnderlyingModal(event)">
         <div class="modal-container" onclick="event.stopPropagation()">
             <div class="modal-header">
                 <div class="modal-title">
