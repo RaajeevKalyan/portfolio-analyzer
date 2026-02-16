@@ -195,7 +195,10 @@ class StockInfoService:
         """
         Normalize ticker symbol for yfinance lookup
         
-        Handles international ticker formats and common variations.
+        Handles:
+        - Share class symbols: BRK.B → BRK-B (US convention)
+        - International suffixes: Keep as-is (.T, .L, .DE)
+        - Common ticker variations
         
         Args:
             symbol: Raw ticker symbol
@@ -208,14 +211,66 @@ class StockInfoService:
         
         symbol = symbol.strip().upper()
         
-        # Already has a suffix, keep as-is
+        # Check if this is an international suffix (exchange code)
+        # International suffixes are typically 1-3 chars after the dot
         if '.' in symbol:
-            return symbol
-        
-        # Some international stocks need suffixes added
-        # This is a heuristic - yfinance is usually smart enough to find them
+            parts = symbol.split('.')
+            if len(parts) == 2:
+                base, suffix = parts
+                
+                # Check if this is a known international exchange suffix
+                suffix_with_dot = f'.{suffix}'
+                if suffix_with_dot in self.TICKER_SUFFIX_COUNTRY:
+                    # International ticker - keep the dot
+                    return symbol
+                
+                # Check if suffix is a single letter (likely share class: A, B, C)
+                # US share classes use dashes in Yahoo Finance
+                if len(suffix) == 1 and suffix.isalpha():
+                    normalized = f"{base}-{suffix}"
+                    logger.debug(f"Normalized share class ticker: {symbol} → {normalized}")
+                    return normalized
+                
+                # Other suffixes with single letters might also be share classes
+                # Check common patterns like PR, WS, UN
+                if suffix in ['PR', 'WS', 'UN', 'W', 'U']:
+                    # These are common warrant/unit suffixes
+                    normalized = f"{base}-{suffix}"
+                    logger.debug(f"Normalized special suffix: {symbol} → {normalized}")
+                    return normalized
         
         return symbol
+    
+    def _get_ticker_variants(self, symbol: str) -> list:
+        """
+        Generate ticker variants to try for symbols that might fail
+        
+        Args:
+            symbol: Original ticker symbol
+            
+        Returns:
+            List of ticker variants to try in order
+        """
+        variants = [symbol]  # Always try original first
+        
+        # If symbol has a dash, also try with dot
+        if '-' in symbol:
+            dot_version = symbol.replace('-', '.')
+            variants.append(dot_version)
+        
+        # If symbol has a dot (and wasn't already converted), try dash
+        if '.' in symbol:
+            dash_version = symbol.replace('.', '-')
+            if dash_version not in variants:
+                variants.append(dash_version)
+        
+        # For share class tickers, also try without suffix
+        if '-' in symbol or '.' in symbol:
+            base = symbol.split('-')[0].split('.')[0]
+            if base not in variants:
+                variants.append(base)
+        
+        return variants
     
     def _infer_country_from_ticker(self, symbol: str) -> Optional[str]:
         """
@@ -236,25 +291,61 @@ class StockInfoService:
         
         return None
     
-    def get_stock_info(self, symbol: str) -> Optional[Dict]:
+    def _is_cache_complete(self, data: Dict) -> bool:
+        """
+        Check if cached data has real information (not just Unknown placeholders)
+        
+        Returns True if at least sector OR country is known
+        """
+        if not data:
+            return False
+        
+        sector = data.get('sector', 'Unknown')
+        country = data.get('country', 'Unknown')
+        
+        # Cache is complete if we have at least one real value
+        has_sector = sector and sector != 'Unknown' and sector != 'N/A'
+        has_country = country and country != 'Unknown' and country != 'N/A'
+        
+        return has_sector or has_country
+    
+    def get_stock_info(self, symbol: str, force_refresh: bool = False) -> Optional[Dict]:
         """
         Fetch stock information from Yahoo Finance
         
         Handles both US and international tickers.
+        Tries multiple ticker variants for share class symbols.
         
         Args:
             symbol: Stock ticker symbol (US or international)
+            force_refresh: If True, ignore cache and fetch fresh data
             
         Returns:
             Dict with sector, industry, country, geography or None if failed
         """
-        # Normalize symbol
-        symbol = self._normalize_ticker(symbol)
+        original_symbol = symbol.strip().upper() if symbol else symbol
         
-        # Check cache first (in-memory and persistent)
-        if symbol in self.cache:
-            logger.debug(f"Using cached info for {symbol}")
-            return self.cache[symbol]
+        # Normalize symbol
+        normalized = self._normalize_ticker(symbol)
+        
+        # Check cache first (unless force refresh)
+        if not force_refresh:
+            # Check both original and normalized in cache
+            for cache_key in [original_symbol, normalized]:
+                if cache_key in self.cache:
+                    cached = self.cache[cache_key]
+                    if self._is_cache_complete(cached):
+                        logger.debug(f"Using cached info for {cache_key}")
+                        return cached
+                    else:
+                        logger.debug(f"Cache entry for {cache_key} is incomplete, will retry")
+        
+        # Get all ticker variants to try
+        variants = self._get_ticker_variants(normalized)
+        if original_symbol not in variants:
+            variants.insert(0, original_symbol)
+        
+        logger.debug(f"Will try ticker variants: {variants}")
         
         # Check rate limits
         self._check_rate_limit()
@@ -262,90 +353,101 @@ class StockInfoService:
         # Enforce delay
         self._enforce_delay()
         
-        try:
-            logger.info(f"Fetching Yahoo Finance info for {symbol} ({self.request_count + 1} requests this hour)")
-            
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
-            
-            # Increment request counter
-            self.request_count += 1
-            
-            if not info or len(info) == 0:
-                logger.warning(f"No info returned for {symbol}")
-                # Try to infer country from ticker suffix
-                inferred_country = self._infer_country_from_ticker(symbol)
-                if inferred_country:
-                    result = {
-                        'sector': 'Unknown',
-                        'industry': 'Unknown',
-                        'country': inferred_country,
-                        'geography': self._map_country_to_geography(inferred_country)
-                    }
-                    self.cache[symbol] = result
-                    self._save_cache()
-                    logger.info(f"Inferred country for {symbol} from ticker: {inferred_country}")
-                    return result
-                return self._get_placeholder_data()
-            
-            # Extract relevant fields
-            # For stocks: sector, industry, country are direct fields
-            # For funds/ETFs: may have 'category' instead of 'sector'
-            sector = info.get('sector')
-            if not sector or sector == 'Unknown':
-                sector = info.get('category', 'Unknown')
-            
-            industry = info.get('industry', 'Unknown')
-            country = info.get('country', 'Unknown')
-            
-            # If country not found, try to infer from ticker suffix
-            if country == 'Unknown' or not country:
-                inferred_country = self._infer_country_from_ticker(symbol)
-                if inferred_country:
-                    country = inferred_country
-                    logger.debug(f"Inferred country for {symbol} from ticker: {country}")
-            
-            # Clean up values
-            sector = str(sector).strip() if sector and sector != 'Unknown' else 'Unknown'
-            industry = str(industry).strip() if industry and industry != 'Unknown' else 'Unknown'
-            country = str(country).strip() if country and country != 'Unknown' else 'Unknown'
-            
-            # Map to geography region
-            geography = self._map_country_to_geography(country)
-            
-            result = {
-                'sector': sector,
-                'industry': industry,
-                'country': country,
-                'geography': geography
-            }
-            
-            # Cache the result (both in-memory and persistent)
-            self.cache[symbol] = result
-            self._save_cache()
-            
-            logger.info(f"✓ Info for {symbol}: {sector} / {country} / {geography}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error fetching info for {symbol}: {e}")
-            
-            # Try to infer country from ticker suffix as fallback
-            inferred_country = self._infer_country_from_ticker(symbol)
-            if inferred_country:
+        # Try each variant until one works
+        last_error = None
+        for variant in variants:
+            try:
+                logger.info(f"Fetching Yahoo Finance info for {variant} ({self.request_count + 1} requests this hour)")
+                
+                ticker = yf.Ticker(variant)
+                info = ticker.info
+                
+                # Increment request counter
+                self.request_count += 1
+                
+                if not info or len(info) == 0:
+                    logger.warning(f"No info returned for {variant}")
+                    continue
+                
+                # Check if we got meaningful data (not just empty/error response)
+                # yfinance sometimes returns a dict with just 'trailingPegRatio' for invalid tickers
+                if 'sector' not in info and 'country' not in info and 'industry' not in info:
+                    if 'longName' not in info and 'shortName' not in info:
+                        logger.warning(f"Incomplete response for {variant}, trying next variant")
+                        continue
+                
+                # Extract relevant fields
+                sector = info.get('sector')
+                if not sector or sector == 'Unknown':
+                    sector = info.get('category', 'Unknown')
+                
+                industry = info.get('industry', 'Unknown')
+                country = info.get('country', 'Unknown')
+                
+                # If country not found, try to infer from ticker suffix
+                if country == 'Unknown' or not country:
+                    inferred_country = self._infer_country_from_ticker(original_symbol)
+                    if inferred_country:
+                        country = inferred_country
+                        logger.debug(f"Inferred country for {original_symbol} from ticker: {country}")
+                
+                # Clean up values
+                sector = str(sector).strip() if sector and sector != 'Unknown' else 'Unknown'
+                industry = str(industry).strip() if industry and industry != 'Unknown' else 'Unknown'
+                country = str(country).strip() if country and country != 'Unknown' else 'Unknown'
+                
+                # Map to geography region
+                geography = self._map_country_to_geography(country)
+                
                 result = {
-                    'sector': 'Unknown',
-                    'industry': 'Unknown',
-                    'country': inferred_country,
-                    'geography': self._map_country_to_geography(inferred_country)
+                    'sector': sector,
+                    'industry': industry,
+                    'country': country,
+                    'geography': geography
                 }
-                self.cache[symbol] = result
-                self._save_cache()
-                logger.info(f"Fallback: inferred country for {symbol} from ticker: {inferred_country}")
-                return result
-            
-            # Return placeholder instead of None to avoid blocking
-            return self._get_placeholder_data()
+                
+                # Only cache if we got at least some real data
+                if self._is_cache_complete(result):
+                    # Cache under original symbol (for future lookups)
+                    self.cache[original_symbol] = result
+                    if normalized != original_symbol:
+                        self.cache[normalized] = result
+                    self._save_cache()
+                    
+                    logger.info(f"✓ Info for {original_symbol}: {sector} / {country} / {geography}")
+                    return result
+                else:
+                    logger.warning(f"Got incomplete data for {variant}: sector={sector}, country={country}")
+                    continue
+                
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Error fetching {variant}: {e}")
+                continue
+        
+        # All variants failed
+        logger.error(f"All ticker variants failed for {original_symbol}: {last_error}")
+        
+        # Try to infer country from ticker suffix as fallback
+        inferred_country = self._infer_country_from_ticker(original_symbol)
+        if inferred_country:
+            result = {
+                'sector': 'Unknown',
+                'industry': 'Unknown',
+                'country': inferred_country,
+                'geography': self._map_country_to_geography(inferred_country)
+            }
+            self.cache[original_symbol] = result
+            self._save_cache()
+            logger.info(f"Fallback: inferred country for {original_symbol} from ticker: {inferred_country}")
+            return result
+        
+        # Return placeholder and cache it (so we don't keep retrying)
+        placeholder = self._get_placeholder_data()
+        self.cache[original_symbol] = placeholder
+        self._save_cache()
+        
+        return placeholder
     
     def _get_placeholder_data(self) -> Dict:
         """Return placeholder data when fetch fails"""

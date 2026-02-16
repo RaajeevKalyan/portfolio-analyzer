@@ -81,11 +81,13 @@ class MerrillCSVParser(CSVParserBase):
         Merrill CSVs have this structure:
         1. Account summary (skip)
         2. Empty line with ""
-        3. Data section starting with column headers
-        4. Data rows
-        5. Footer with totals (skip)
-        
-        IMPORTANT: We now KEEP cash rows instead of filtering them out.
+        3. Data section starting with column headers (Symbol, Description, ...)
+        4. Data rows (holdings)
+        5. "Balances" row (marker, but cash data follows!)
+        6. "Money accounts" row (THIS IS THE CASH - we want this!)
+        7. "Cash balance" row
+        8. "Pending activity" row
+        9. "Total" row (footer - stop here)
         
         Returns:
             pd.DataFrame: Extracted data or None
@@ -95,56 +97,87 @@ class MerrillCSVParser(CSVParserBase):
             with open(file_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
             
+            # Log first 30 lines for debugging
+            logger.debug("First 30 lines of file:")
+            for i, line in enumerate(lines[:30]):
+                logger.debug(f"  [{i}]: {line.rstrip()[:100]}")
+            
             # Find the header row (starts with "Symbol")
             header_idx = None
             data_start_idx = None
             
             for i, line in enumerate(lines):
-                # Look for the column header line
+                # Look for the column header line - must have Symbol AND Description AND Quantity
                 if 'Symbol' in line and 'Description' in line and 'Quantity' in line:
                     header_idx = i
                     data_start_idx = i + 1
+                    logger.info(f"Found header at line {i}: {line.rstrip()[:80]}")
                     break
             
             if header_idx is None:
                 logger.error("Could not find data section with Symbol/Description/Quantity columns")
                 return None
             
-            # Find where data ends (look for footer markers like "Total" at start of line)
+            # Find where data ends - ONLY stop at "Total" row, not "Balances"
+            # "Balances" is just a section marker, cash data follows it
             data_end_idx = len(lines)
             for i in range(data_start_idx, len(lines)):
-                line_content = lines[i].strip().strip('"').strip()
+                line_stripped = lines[i].strip().strip('"').strip()
                 
-                # Stop at footer markers that indicate end of holdings data
-                # Be more specific: only stop if line STARTS with these markers
-                if line_content.startswith('Total') or line_content.startswith('Balances'):
+                # ONLY stop at "Total" row - this is the true footer
+                if line_stripped.startswith('Total'):
                     data_end_idx = i
+                    logger.info(f"Found 'Total' footer at line {i}, stopping here")
                     break
-                    
-                # Stop at empty lines after data
-                if line_content == '' or line_content == ',':
-                    # Check if this is truly the end (no more data after)
-                    has_more_data = False
-                    for j in range(i+1, min(i+5, len(lines))):
-                        if lines[j].strip() and 'Symbol' not in lines[j] and '"Total"' not in lines[j]:
-                            has_more_data = True
-                            break
-                    if not has_more_data:
-                        data_end_idx = i
-                        break
             
             # Extract header and data lines
             header_line = lines[header_idx]
             data_lines = lines[data_start_idx:data_end_idx]
             
-            # Filter out empty lines and lines that are just commas
-            # BUT keep cash-related lines
-            data_lines = [line for line in data_lines if line.strip() and line.strip() != ',' and line.strip() != '""']
+            logger.info(f"Extracting lines {data_start_idx} to {data_end_idx} ({len(data_lines)} lines)")
+            
+            # Filter out:
+            # - Empty lines
+            # - Lines that are just commas
+            # - "Balances" marker row (no useful data)
+            # - "Cash balance" row (usually $0.00)
+            # - "Pending activity" row (usually $0.00)
+            # BUT KEEP "Money accounts" row - this has the actual cash!
+            filtered_lines = []
+            for line in data_lines:
+                line_stripped = line.strip()
+                
+                # Skip empty lines
+                if not line_stripped or line_stripped == ',' or line_stripped == '""':
+                    continue
+                
+                # Skip the "Balances" marker row (it's just a section header with no data)
+                if line_stripped.startswith('"Balances"'):
+                    logger.debug(f"Skipping Balances marker row")
+                    continue
+                
+                # Skip "Cash balance" if it's $0.00
+                if 'Cash balance' in line and '$0.00' in line:
+                    logger.debug(f"Skipping Cash balance row (zero value)")
+                    continue
+                
+                # Skip "Pending activity" if it's $0.00
+                if 'Pending activity' in line and '$0.00' in line:
+                    logger.debug(f"Skipping Pending activity row (zero value)")
+                    continue
+                
+                # Log if this is a Money accounts row
+                if 'Money accounts' in line:
+                    logger.info(f"Including Money accounts row: {line.rstrip()[:80]}")
+                
+                filtered_lines.append(line)
+            
+            logger.info(f"After filtering: {len(filtered_lines)} data lines")
             
             # Combine into CSV content
-            csv_content = header_line + ''.join(data_lines)
+            csv_content = header_line + ''.join(filtered_lines)
             
-            logger.debug(f"Extracted CSV content:\n{csv_content[:500]}")
+            logger.debug(f"CSV content (last 500 chars):\n{csv_content[-500:]}")
             
             # Save to temporary file
             with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
@@ -152,7 +185,7 @@ class MerrillCSVParser(CSVParserBase):
                 tmp_path = tmp.name
             
             # Load as DataFrame
-            df = pd.read_csv(tmp_path, skipinitialspace=True, on_bad_lines='skip')
+            df = pd.read_csv(tmp_path, skipinitialspace=True, on_bad_lines='warn')
             
             # Clean up temp file
             os.unlink(tmp_path)
@@ -163,18 +196,15 @@ class MerrillCSVParser(CSVParserBase):
             # Remove any empty rows
             df = df.dropna(how='all')
             
-            # Filter out ONLY true footer rows (Total, Pending transactions, etc.)
-            # IMPORTANT: We NO LONGER filter out Cash/Money rows
+            # Log what we got
             if 'Symbol' in df.columns:
-                df = df[df['Symbol'].notna()]
-                # Only filter out summary/footer rows, NOT cash holdings
-                df = df[~df['Symbol'].str.contains('^Total$|^Pending|^Balances$', case=False, na=False, regex=True)]
+                logger.info(f"Symbols in parsed DataFrame: {list(df['Symbol'].values)}")
             
             logger.info(f"Extracted Merrill data section: {len(df)} rows, {len(df.columns)} columns")
-            logger.debug(f"Columns: {list(df.columns)}")
             
             if len(df) > 0:
                 logger.debug(f"First row: {df.iloc[0].to_dict()}")
+                logger.debug(f"Last row: {df.iloc[-1].to_dict()}")
             
             self.df = df
             return df
@@ -339,6 +369,53 @@ class MerrillCSVParser(CSVParserBase):
         # Check if this is a cash holding BEFORE rejecting empty symbols
         is_cash = self._is_cash_holding(symbol, description)
         
+        # Debug logging for potential cash rows
+        if is_cash or (symbol and 'MONEY' in str(symbol).upper()):
+            logger.info(f"Potential cash row detected:")
+            logger.info(f"  Symbol: {symbol}")
+            logger.info(f"  Description: {description}")
+            logger.info(f"  is_cash: {is_cash}")
+            logger.info(f"  Full row: {row.to_dict()}")
+        
+        # Special handling for "Money accounts" rows in Merrill CSVs
+        # These have a different column structure - "Money accounts" is in the Symbol field
+        if symbol and 'MONEY ACCOUNT' in symbol.upper():
+            logger.info(f"Processing Money accounts row...")
+            # The value is typically in a different position for these rows
+            # Try to find a dollar value in the row
+            found_value = None
+            for col_name, value in row.items():
+                if pd.notna(value):
+                    val_str = str(value).strip()
+                    # Look for a dollar amount that's not $0.00
+                    if val_str.startswith('$') and val_str != '$0.00':
+                        val_cleaned = val_str.replace('$', '').replace(',', '').strip()
+                        try:
+                            val_amount = Decimal(val_cleaned)
+                            if val_amount > 0:
+                                found_value = val_amount
+                                logger.info(f"  Found cash value in column '{col_name}': ${val_amount}")
+                                break
+                        except Exception as e:
+                            logger.debug(f"  Could not parse '{val_str}' as decimal: {e}")
+                            continue
+            
+            if found_value:
+                result = {
+                    'symbol': 'CASH',
+                    'name': description or 'Cash / Money Market',
+                    'quantity': Decimal('1.00'),
+                    'price': found_value,
+                    'total_value': found_value,
+                    'asset_type': 'cash',
+                    'account_type': None
+                }
+                logger.info(f"  ✓ Created cash holding: ${found_value}")
+                return result
+            else:
+                logger.warning(f"  ✗ Could not find valid cash value in Money accounts row")
+                return None
+        
         if not symbol or symbol == '' or symbol == 'N/A':
             if is_cash:
                 # Generate a synthetic symbol for cash
@@ -374,6 +451,23 @@ class MerrillCSVParser(CSVParserBase):
                 value_cleaned = f"{integer_part}.{parts[1]}"
         
         total_value = self.clean_currency(value_cleaned)
+        
+        # For cash with $0 in value column, try to find the real value elsewhere
+        if total_value == 0 and is_cash:
+            for col_name, value in row.items():
+                if pd.notna(value) and col_name != columns['value']:
+                    val_str = str(value).strip()
+                    if val_str.startswith('$') and val_str != '$0.00':
+                        val_cleaned = val_str.replace('$', '').replace(',', '').strip()
+                        try:
+                            val_amount = Decimal(val_cleaned)
+                            if val_amount > 0:
+                                total_value = val_amount
+                                logger.info(f"Found alternate cash value: ${total_value}")
+                                break
+                        except:
+                            continue
+        
         if total_value == 0:
             return None
         
@@ -429,7 +523,7 @@ class MerrillCSVParser(CSVParserBase):
         Determine if a row represents a cash holding
         
         Args:
-            symbol: The symbol (may be empty for cash)
+            symbol: The symbol (may be empty for cash, or contain cash identifiers like "Money accounts")
             description: The description field
             
         Returns:
@@ -438,15 +532,19 @@ class MerrillCSVParser(CSVParserBase):
         symbol_upper = symbol.upper() if symbol else ''
         desc_upper = description.upper() if description else ''
         
-        # Cash keywords
+        # Combined text for keyword search
+        combined = f"{symbol_upper} {desc_upper}"
+        
+        # Cash keywords - expanded to catch Merrill's various formats
         cash_keywords = [
             'CASH', 'MONEY MARKET', 'SWEEP', 'SETTLEMENT', 'CORE',
             'FDIC', 'BANK DEPOSIT', 'CASH BALANCE', 'AVAILABLE CASH',
-            'UNINVESTED', 'PENDING'
+            'UNINVESTED', 'PENDING', 'MONEY ACCOUNTS', 'BANK OF AMERICA',
+            'RASP', 'SAVINGS', 'CHECKING', 'DEPOSIT', 'MONEY ACCOUNT'
         ]
         
         for keyword in cash_keywords:
-            if keyword in symbol_upper or keyword in desc_upper:
+            if keyword in combined:
                 return True
         
         return False

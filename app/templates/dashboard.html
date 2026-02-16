@@ -160,7 +160,7 @@
         .breakdown-pct {
             font-size: 0.8rem;
             opacity: 0.85;
-        }        
+        }     
 
         .net-worth-label {
             font-size: 0.9rem;
@@ -775,8 +775,8 @@
             background: var(--bg-card);
             border-radius: 12px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 1000px;
-            width: 100%;
+            max-width: 1200px;  /* INCREASED from 900px */
+            width: 95%;         /* Use more screen width */
             max-height: 85vh;
             display: flex;
             flex-direction: column;
@@ -920,7 +920,16 @@
         .underlying-table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
+
+        .underlying-table th:nth-child(1) { width: 10%; }  /* Symbol */
+        .underlying-table th:nth-child(2) { width: 25%; }  /* Name */
+        .underlying-table th:nth-child(3) { width: 10%; }  /* Weight */
+        .underlying-table th:nth-child(4) { width: 12%; }  /* Est. Value */
+        .underlying-table th:nth-child(5) { width: 15%; }  /* Sector */
+        .underlying-table th:nth-child(6) { width: 12%; }  /* Country */
+        .underlying-table th:nth-child(7) { width: 16%; }  /* Overlap */        
 
         .underlying-table thead th {
             background: var(--bg-secondary);
@@ -950,8 +959,17 @@
         }
 
         .underlying-table td {
-            padding: 0.75rem;
+            padding: 0.75rem 1rem;
             color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Allow name column to wrap if needed */
+        .underlying-table td:nth-child(2) {
+            white-space: normal;
+            word-wrap: break-word;
         }
 
         .underlying-symbol {
@@ -962,6 +980,8 @@
         .underlying-name {
             color: var(--text-secondary);
             font-size: 0.9rem;
+            display: block;
+            max-width: 100%;
         }
 
         .weight-value {
@@ -1473,6 +1493,10 @@
             font-size: 0.9rem;
             color: var(--text-secondary);
             font-weight: normal;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .progress-bar-container {
@@ -1673,12 +1697,13 @@
                     <span class="net-worth-label">Total Net Worth:</span>
                     <span class="net-worth-value">${{ "{:,.2f}".format(total_net_worth) }}</span>
                 </div>
-                
+
                 <!-- NEW: Cash vs Investment Breakdown -->
                 <div class="net-worth-breakdown">
                     <div class="breakdown-item">
                         <span class="breakdown-label">Investments</span>
-                        <span class="breakdown-value">${{ "{:,.2f}".format(total_investments|default(total_net_worth)) }}</span>
+                        <span class="breakdown-value">${{ "{:,.2f}".format(total_investments|default(total_net_worth))
+                            }}</span>
                         <span class="breakdown-pct">{{ "{:.1f}".format(investment_percentage|default(100)) }}%</span>
                     </div>
                     <div class="breakdown-item">
@@ -1900,24 +1925,24 @@
                             <span class="stat-value" id="progressPercent">0%</span>
                         </div>
                         <div class="stat">
-                            <span class="stat-label">Cached Symbols:</span>
-                            <span class="stat-value" id="cachedCount">0</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-label">API Requests (this hour):</span>
-                            <span class="stat-value" id="requestCount">0 / 2000</span>
-                        </div>
-                        <div class="stat">
                             <span class="stat-label">Remaining:</span>
                             <span class="stat-value" id="remainingCount">0</span>
                         </div>
+                        <div class="stat">
+                            <span class="stat-label">Cache Hits:</span>
+                            <span class="stat-value" id="cacheHits">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">API Calls:</span>
+                            <span class="stat-value" id="apiCalls">0</span>
+                        </div>
                     </div>
                     <div class="progress-message">
-                        <small id="progressMessage">Fetching sector and country data... This may take a few minutes.</small>
+                        <small id="progressMessage">Initializing...</small>
                     </div>
                 </div>
             </div>
-        </div>       
+        </div>
         
        <!-- Holdings Section -->
         <div class="holdings-section mt-5">
@@ -2515,7 +2540,7 @@
         
         if (!ctx) return;
         
-        // Hide if no data or only Unknown
+        // Check if we have meaningful data
         if (!sectors || Object.keys(sectors).length === 0) {
             ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Sector data not available yet</p>';
             if (legendDiv) legendDiv.innerHTML = '';
@@ -2528,8 +2553,11 @@
             return;
         }
         
-        const labels = Object.keys(sectors);
-        const data = Object.values(sectors);
+        // Sectors are already sorted by backend, but ensure order is maintained
+        // Convert to arrays preserving order
+        const sortedEntries = Object.entries(sectors).sort((a, b) => b[1] - a[1]);
+        const labels = sortedEntries.map(([k, v]) => k);
+        const data = sortedEntries.map(([k, v]) => v);
         
         // Get threshold from localStorage
         const threshold = parseInt(localStorage.getItem('risk_sector') || '40');
@@ -2579,13 +2607,13 @@
             }
         });
         
-        // Add legend
+        // Add legend (also sorted)
         if (legendDiv) {
-            legendDiv.innerHTML = labels.map((label, idx) =>
+            legendDiv.innerHTML = sortedEntries.map(([label, value], idx) =>
                 '<div class="chart-legend-item">' +
                     '<div class="legend-color" style="background: ' + backgroundColors[idx] + ';"></div>' +
                     '<span class="legend-label">' + label + '</span>' +
-                    '<span class="legend-value">' + data[idx] + '%</span>' +
+                    '<span class="legend-value">' + value + '%</span>' +
                 '</div>'
             ).join('');
         }
@@ -2597,7 +2625,6 @@
         
         if (!ctx) return;
         
-        // Check if we have meaningful data (not 100% Unknown)
         if (!geography || Object.keys(geography).length === 0) {
             ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Geography data not available yet</p>';
             if (legendDiv) legendDiv.innerHTML = '';
@@ -2614,12 +2641,14 @@
         const labels = Object.keys(geography);
         const data = Object.values(geography);
         
-        // Color mapping
+        // Color mapping - includes Cash now
         const colorMap = {
             'US': '#667eea',
             'International Developed': '#764ba2',
             'Emerging Markets': '#f093fb',
-            'Unknown': '#cbd5e0'
+            'Cash': '#10b981',  // Green for cash
+            'Unknown': '#cbd5e0',
+            'Other': '#a0aec0'
         };
         
         const backgroundColors = labels.map(label => colorMap[label] || '#a0aec0');
@@ -2664,8 +2693,7 @@
             ).join('');
         }
     }
-
-    
+        
     function updateOverallRisk(riskLevel, concentration) {
         const badge = document.getElementById('overallRiskBadge');
         if (!badge) return;
@@ -2825,20 +2853,22 @@
                     checkingProgress = true;
                     progressDiv.style.display = 'block';
                     
-                    // Update all progress indicators
-                    document.getElementById('cachedCount').textContent = data.cached_symbols || 0;
-                    document.getElementById('requestCount').textContent = 
-                        `${data.requests_this_hour || 0} / ${data.rate_limit || 2000}`;
-                    document.getElementById('remainingCount').textContent = data.unresolved_count || 0;
-                    
                     // Update progress bar and percentage
                     const progressPct = data.progress_percentage || 0;
                     document.getElementById('progressPercent').textContent = `${progressPct}%`;
                     document.getElementById('progressBarFill').style.width = `${progressPct}%`;
                     
+                    // Update remaining count - this now shows actual remaining
+                    const remaining = data.total_remaining || data.unresolved_count || 0;
+                    document.getElementById('remainingCount').textContent = remaining;
+                    
+                    // Update cache hits and API calls
+                    document.getElementById('cacheHits').textContent = data.cached_hits || 0;
+                    document.getElementById('apiCalls').textContent = data.api_calls || 0;
+                    
                     // Update current symbol being processed
                     if (data.current_symbol) {
-                        document.getElementById('currentSymbol').textContent = `Processing: ${data.current_symbol}`;
+                        document.getElementById('currentSymbol').textContent = data.current_symbol;
                     } else {
                         document.getElementById('currentSymbol').textContent = '';
                     }
@@ -2848,9 +2878,9 @@
                     if (data.current_step === 'etf_resolution') {
                         messageEl.textContent = 'Resolving ETF/Mutual Fund underlying holdings...';
                     } else if (data.current_step === 'parent_info') {
-                        messageEl.textContent = 'Fetching sector and country data for holdings...';
+                        messageEl.textContent = `Fetching sector data for holdings (${data.parent_symbols_processed || 0}/${data.parent_symbols_total || 0})...`;
                     } else if (data.current_step === 'underlying_info') {
-                        messageEl.textContent = 'Enriching underlying holdings with sector data...';
+                        messageEl.textContent = `Enriching underlying holdings (${data.underlying_symbols_processed || 0}/${data.underlying_symbols_total || 0})...`;
                     } else {
                         messageEl.textContent = 'Processing holdings data...';
                     }

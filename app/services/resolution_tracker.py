@@ -31,6 +31,12 @@ _current_status = {
     'current_symbol': None,
     'symbols_processed': 0,
     'symbols_total': 0,
+    'parent_symbols_total': 0,
+    'parent_symbols_processed': 0,
+    'underlying_symbols_total': 0,
+    'underlying_symbols_processed': 0,
+    'cached_hits': 0,
+    'api_calls': 0,
     'started_at': None,
     'last_update': None,
     'errors': []
@@ -59,13 +65,16 @@ def _save_status():
         logger.error(f"Error saving resolution status: {e}")
 
 
-def start_resolution(snapshot_id: int, total_symbols: int = 0):
+def start_resolution(snapshot_id: int, total_symbols: int = 0, 
+                     parent_total: int = 0, underlying_total: int = 0):
     """
     Mark resolution as started
     
     Args:
         snapshot_id: The snapshot being processed
-        total_symbols: Total number of symbols to process
+        total_symbols: Total number of symbols to process (legacy)
+        parent_total: Number of parent holdings
+        underlying_total: Estimated underlying symbols
     """
     global _current_status
     with _status_lock:
@@ -76,25 +85,37 @@ def start_resolution(snapshot_id: int, total_symbols: int = 0):
             'current_symbol': None,
             'symbols_processed': 0,
             'symbols_total': total_symbols,
+            'parent_symbols_total': parent_total,
+            'parent_symbols_processed': 0,
+            'underlying_symbols_total': underlying_total,
+            'underlying_symbols_processed': 0,
+            'cached_hits': 0,
+            'api_calls': 0,
             'started_at': datetime.now().isoformat(),
             'last_update': datetime.now().isoformat(),
             'errors': []
         }
         _save_status()
-        logger.info(f"Resolution started for snapshot {snapshot_id} with {total_symbols} symbols")
+        logger.info(f"Resolution started for snapshot {snapshot_id}: {parent_total} parent, ~{underlying_total} underlying")
 
 
 def update_progress(step: str, symbol: Optional[str] = None, processed: Optional[int] = None, 
-                   total: Optional[int] = None, message: Optional[str] = None):
+                   total: Optional[int] = None, message: Optional[str] = None,
+                   parent_processed: Optional[int] = None, underlying_processed: Optional[int] = None,
+                   underlying_total: Optional[int] = None, cached: bool = False):
     """
     Update resolution progress
     
     Args:
         step: Current step ('etf_resolution', 'parent_info', 'underlying_info')
         symbol: Current symbol being processed
-        processed: Number of symbols processed so far
+        processed: Number of symbols processed so far (legacy)
         total: Total symbols to process (if changed)
         message: Optional status message
+        parent_processed: Parent symbols processed
+        underlying_processed: Underlying symbols processed
+        underlying_total: Total underlying symbols (may update as we discover more)
+        cached: Whether this symbol was found in cache
     """
     global _current_status
     with _status_lock:
@@ -107,11 +128,21 @@ def update_progress(step: str, symbol: Optional[str] = None, processed: Optional
             _current_status['symbols_processed'] = processed
         if total is not None:
             _current_status['symbols_total'] = total
+        if parent_processed is not None:
+            _current_status['parent_symbols_processed'] = parent_processed
+        if underlying_processed is not None:
+            _current_status['underlying_symbols_processed'] = underlying_processed
+        if underlying_total is not None:
+            _current_status['underlying_symbols_total'] = underlying_total
+        if cached:
+            _current_status['cached_hits'] = _current_status.get('cached_hits', 0) + 1
+        else:
+            _current_status['api_calls'] = _current_status.get('api_calls', 0) + 1
         
         _save_status()
         
         if symbol:
-            logger.debug(f"Resolution progress: {step} - {symbol} ({processed}/{total})")
+            logger.debug(f"Resolution progress: {step} - {symbol}")
 
 
 def log_error(symbol: str, error: str):
@@ -171,14 +202,29 @@ def get_resolution_status() -> Dict:
     Get current resolution status
     
     Returns:
-        Dict with current status information
+        Dict with current status information including:
+        - parent_remaining: Parent symbols left to process
+        - underlying_remaining: Underlying symbols left to process
+        - total_remaining: Total symbols left
+        - cached_hits: Number of cache hits
+        - api_calls: Number of API calls made
     """
     global _current_status
     with _status_lock:
         # Calculate progress percentage
-        total = _current_status.get('symbols_total', 0)
-        processed = _current_status.get('symbols_processed', 0)
-        progress_pct = (processed / total * 100) if total > 0 else 0
+        parent_total = _current_status.get('parent_symbols_total', 0)
+        parent_done = _current_status.get('parent_symbols_processed', 0)
+        underlying_total = _current_status.get('underlying_symbols_total', 0)
+        underlying_done = _current_status.get('underlying_symbols_processed', 0)
+        
+        total = parent_total + underlying_total
+        done = parent_done + underlying_done
+        progress_pct = (done / total * 100) if total > 0 else 0
+        
+        # Calculate remaining
+        parent_remaining = max(0, parent_total - parent_done)
+        underlying_remaining = max(0, underlying_total - underlying_done)
+        total_remaining = parent_remaining + underlying_remaining
         
         # Calculate elapsed time
         elapsed = None
@@ -193,7 +239,12 @@ def get_resolution_status() -> Dict:
             **_current_status,
             'progress_percentage': round(progress_pct, 1),
             'elapsed_time': elapsed,
-            'error_count': len(_current_status.get('errors', []))
+            'error_count': len(_current_status.get('errors', [])),
+            'parent_remaining': parent_remaining,
+            'underlying_remaining': underlying_remaining,
+            'total_remaining': total_remaining,
+            'cached_hits': _current_status.get('cached_hits', 0),
+            'api_calls': _current_status.get('api_calls', 0)
         }
 
 

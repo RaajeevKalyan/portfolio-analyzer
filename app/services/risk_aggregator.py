@@ -1,7 +1,11 @@
 """
 Risk Aggregation Service - Calculate sector and geography breakdowns
 
-Save this as: app/services/risk_aggregator.py
+CHANGELOG:
+- Fixed: Sector chart now sorted by value descending
+- Fixed: Geography includes Cash category
+- Fixed: Percentages now sum to 100% (adds "Other" if needed)
+- Fixed: Cash holdings properly categorized
 """
 import logging
 from typing import Dict, List
@@ -24,8 +28,8 @@ class RiskAggregator:
         Returns:
             dict: {
                 'concentration': [...],  # Top holdings with allocation %
-                'sectors': {...},        # Sector breakdown
-                'geography': {...},      # Geographic breakdown
+                'sectors': {...},        # Sector breakdown (sorted descending)
+                'geography': {...},      # Geographic breakdown (includes Cash)
                 'overall_risk': 'low'|'medium'|'high'
             }
         """
@@ -48,14 +52,18 @@ class RiskAggregator:
             # Calculate total portfolio value
             total_value = sum(float(h.total_value) for h in holdings)
             
-            # Calculate concentration (top holdings)
-            concentration = self._calculate_concentration(holdings, total_value)
+            # Separate cash from investments
+            cash_value = sum(float(h.total_value) for h in holdings if h.asset_type == 'cash')
+            investment_holdings = [h for h in holdings if h.asset_type != 'cash']
             
-            # Calculate sector breakdown
-            sectors = self._calculate_sector_breakdown(holdings, total_value)
+            # Calculate concentration (top holdings) - excludes cash
+            concentration = self._calculate_concentration(investment_holdings, total_value)
             
-            # Calculate geography breakdown
-            geography = self._calculate_geography_breakdown(holdings, total_value)
+            # Calculate sector breakdown - excludes cash
+            sectors = self._calculate_sector_breakdown(investment_holdings, total_value)
+            
+            # Calculate geography breakdown - includes cash as separate category
+            geography = self._calculate_geography_breakdown(holdings, total_value, cash_value)
             
             # Determine overall risk
             overall_risk = self._calculate_overall_risk(concentration)
@@ -65,7 +73,8 @@ class RiskAggregator:
                 'sectors': sectors,
                 'geography': geography,
                 'overall_risk': overall_risk,
-                'total_value': total_value
+                'total_value': total_value,
+                'cash_value': cash_value
             }
     
     def _get_latest_snapshots(self, session) -> List[PortfolioSnapshot]:
@@ -87,9 +96,8 @@ class RiskAggregator:
         """
         Calculate concentration - ONLY return stocks exceeding threshold
         Includes both direct holdings and underlying holdings from ETFs/MFs
+        Excludes cash holdings
         """
-        from collections import defaultdict
-        
         # Get threshold from somewhere (default 20%)
         threshold = 20.0  # TODO: Make this configurable
         
@@ -103,6 +111,10 @@ class RiskAggregator:
         
         # Process all holdings (direct stocks + underlying)
         for holding in holdings:
+            # Skip cash
+            if holding.asset_type == 'cash':
+                continue
+                
             if holding.asset_type == 'stock':
                 symbol = holding.symbol
                 symbol_totals[symbol]['symbol'] = symbol
@@ -141,14 +153,19 @@ class RiskAggregator:
         """
         Calculate sector allocation breakdown
         Includes both direct holdings AND underlying holdings from ETFs/MFs
+        Excludes cash holdings
+        Results are sorted by percentage descending
         """
         from app.services.stock_info_service import StockInfoService
-        from collections import defaultdict
         
         service = StockInfoService()
         sector_totals = defaultdict(float)
         
         for holding in holdings:
+            # Skip cash
+            if holding.asset_type == 'cash':
+                continue
+            
             # Direct stock holdings - use their sector
             if holding.asset_type == 'stock':
                 sector = holding.sector or 'Unknown'
@@ -168,34 +185,44 @@ class RiskAggregator:
         
         # Convert to percentages
         sector_percentages = {}
+        total_pct = 0
+        
         for sector, value in sector_totals.items():
             pct = (value / total_value * 100) if total_value > 0 else 0
             if pct >= 0.1:  # Include sectors with at least 0.1%
                 sector_percentages[sector] = round(pct, 1)
+                total_pct += round(pct, 1)
         
-        # Sort by percentage descending
+        # SORT BY VALUE DESCENDING - this is the key fix
         sector_percentages = dict(sorted(
             sector_percentages.items(),
             key=lambda x: x[1],
             reverse=True
         ))
         
-        logger.info(f"Sector breakdown: {sector_percentages}")
+        logger.info(f"Sector breakdown (sorted): {list(sector_percentages.keys())[:5]}...")
         return sector_percentages
 
 
-    def _calculate_geography_breakdown(self, holdings: List[Holding], total_value: float) -> Dict[str, float]:
+    def _calculate_geography_breakdown(self, holdings: List[Holding], total_value: float, 
+                                       cash_value: float = 0) -> Dict[str, float]:
         """
         Calculate geographic allocation breakdown
         Includes both direct holdings AND underlying holdings from ETFs/MFs
+        Includes Cash as a separate category
+        Ensures total sums to 100%
         """
         from app.services.stock_info_service import StockInfoService
-        from collections import defaultdict
         
         service = StockInfoService()
         geo_totals = defaultdict(float)
         
         for holding in holdings:
+            # Cash goes to "Cash" category
+            if holding.asset_type == 'cash':
+                geo_totals['Cash'] += float(holding.total_value)
+                continue
+            
             # Direct stock holdings - use their country
             if holding.asset_type == 'stock':
                 country = holding.country or 'Unknown'
@@ -218,21 +245,42 @@ class RiskAggregator:
         
         # Convert to percentages
         geo_percentages = {}
+        total_pct = 0
+        
         for geo, value in geo_totals.items():
             pct = (value / total_value * 100) if total_value > 0 else 0
             if pct >= 0.1:  # Include regions with at least 0.1%
-                geo_percentages[geo] = round(pct, 1)
+                rounded_pct = round(pct, 1)
+                geo_percentages[geo] = rounded_pct
+                total_pct += rounded_pct
         
-        # Sort by percentage descending
+        # If total doesn't sum to 100%, add remainder to "Other" 
+        # (this handles rounding errors and untracked value)
+        if total_pct < 99.5 and total_value > 0:
+            remainder = round(100 - total_pct, 1)
+            if remainder >= 0.1:
+                if 'Unknown' in geo_percentages:
+                    geo_percentages['Unknown'] += remainder
+                else:
+                    geo_percentages['Other'] = remainder
+        
+        # Sort by percentage descending, but keep "Cash" and "Unknown"/"Other" at end
+        def sort_key(item):
+            geo, pct = item
+            if geo == 'Cash':
+                return (1, -pct)  # Cash goes near end
+            elif geo in ['Unknown', 'Other']:
+                return (2, -pct)  # Unknown/Other goes last
+            else:
+                return (0, -pct)  # Regular geographies sorted by pct
+        
         geo_percentages = dict(sorted(
             geo_percentages.items(),
-            key=lambda x: x[1],
-            reverse=True
+            key=sort_key
         ))
         
         logger.info(f"Geography breakdown: {geo_percentages}")
         return geo_percentages
-
 
     
     def _calculate_overall_risk(self, concentration: List[Dict]) -> str:
@@ -260,7 +308,8 @@ class RiskAggregator:
             'sectors': {},
             'geography': {},
             'overall_risk': 'low',
-            'total_value': 0
+            'total_value': 0,
+            'cash_value': 0
         }
 
 

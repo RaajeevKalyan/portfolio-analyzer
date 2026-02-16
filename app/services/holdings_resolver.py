@@ -383,19 +383,22 @@ def resolve_snapshot_holdings(snapshot_id: int) -> int:
         etf_mf_holdings = [h for h in all_holdings 
                           if h.asset_type in ['etf', 'mutual_fund'] and not h.underlying_parsed]
         
-        # Calculate total work for progress tracking
-        total_symbols = len(all_holdings) + sum(
-            len(h.underlying_holdings_list or []) for h in all_holdings 
-            if h.asset_type in ['etf', 'mutual_fund']
-        )
+        # Estimate total underlying symbols (rough estimate: ~100 per ETF/MF)
+        estimated_underlying = len(etf_mf_holdings) * 100
         
         logger.info(f"Found {len(all_holdings)} total holdings ({len(etf_mf_holdings)} ETF/MF to resolve)")
         
-        # Start resolution tracking
-        start_resolution(snapshot_id, total_symbols)
+        # Start resolution tracking with detailed counts
+        start_resolution(
+            snapshot_id, 
+            total_symbols=len(all_holdings) + estimated_underlying,
+            parent_total=len(all_holdings),
+            underlying_total=estimated_underlying
+        )
         
         # STEP 1: Resolve ETF/MF underlying holdings
         resolved_count = 0
+        actual_underlying_count = 0
         
         if etf_mf_holdings:
             update_progress('etf_resolution', message=f"Resolving {len(etf_mf_holdings)} ETF/MF holdings")
@@ -420,6 +423,7 @@ def resolve_snapshot_holdings(snapshot_id: int) -> int:
                     # Update underlying holdings
                     if result.get('holdings'):
                         holding.underlying_holdings_list = result['holdings']
+                        actual_underlying_count += len(result['holdings'])
                         resolved_count += 1
                         logger.info(f"Stored {len(result['holdings'])} underlying holdings for {holding.symbol}")
                     
@@ -436,20 +440,29 @@ def resolve_snapshot_holdings(snapshot_id: int) -> int:
                     log_error(holding.symbol, "Failed to resolve underlying holdings")
             
             session.commit()
+            
+            # Update tracker with actual underlying count now that we know it
+            update_progress('etf_resolution', underlying_total=actual_underlying_count)
             logger.info(f"Successfully resolved {resolved_count}/{len(etf_mf_holdings)} ETF/MF holdings")
+            logger.info(f"Total underlying symbols to process: {actual_underlying_count}")
         
         # STEP 2: Fetch sector info for parent holdings
         info_fetched_count = 0
         holdings_needing_info = [h for h in all_holdings if not h.info_fetched]
         
         if holdings_needing_info:
-            update_progress('parent_info', message=f"Fetching info for {len(holdings_needing_info)} holdings")
+            update_progress('parent_info', message=f"Fetching info for {len(holdings_needing_info)} holdings",
+                          parent_processed=0)
             logger.info(f"Fetching sector info for {len(holdings_needing_info)} parent holdings...")
             
             for idx, holding in enumerate(holdings_needing_info, 1):
-                update_progress('parent_info', symbol=holding.symbol, processed=idx, total=len(holdings_needing_info))
+                update_progress('parent_info', symbol=holding.symbol, parent_processed=idx)
                 if fetch_stock_info_for_holding(holding):
                     info_fetched_count += 1
+                
+                # Commit periodically to save progress
+                if idx % 10 == 0:
+                    session.commit()
             
             session.commit()
             logger.info(f"✓ Fetched and SAVED info for {info_fetched_count}/{len(holdings_needing_info)} parent holdings")
@@ -460,14 +473,27 @@ def resolve_snapshot_holdings(snapshot_id: int) -> int:
                                   if h.asset_type in ['etf', 'mutual_fund'] and h.underlying_holdings_list]
         
         if etf_mf_with_underlying:
-            update_progress('underlying_info', message=f"Enriching underlying holdings in {len(etf_mf_with_underlying)} funds")
-            logger.info(f"Fetching sector info for underlying holdings in {len(etf_mf_with_underlying)} ETFs/MFs...")
+            # Calculate actual total underlying
+            total_underlying = sum(len(h.underlying_holdings_list) for h in etf_mf_with_underlying)
+            update_progress('underlying_info', 
+                          message=f"Enriching {total_underlying} underlying holdings",
+                          underlying_total=total_underlying,
+                          underlying_processed=0)
+            logger.info(f"Fetching sector info for {total_underlying} underlying holdings...")
             
+            processed_underlying = 0
             for holding in etf_mf_with_underlying:
-                enriched = fetch_sector_info_for_underlying_holdings(holding)
+                enriched = fetch_sector_info_for_underlying_holdings_with_tracking(
+                    holding, 
+                    processed_underlying,
+                    total_underlying
+                )
                 underlying_enriched_count += enriched
+                processed_underlying += len(holding.underlying_holdings_list or [])
+                
+                # Commit after each holding's underlying is processed
+                session.commit()
             
-            session.commit()
             logger.info(f"✓ Enriched and SAVED {underlying_enriched_count} total underlying holdings")
         
         # Complete resolution tracking
@@ -480,6 +506,80 @@ def resolve_snapshot_holdings(snapshot_id: int) -> int:
                    f"{info_fetched_count} parent info fetched, {underlying_enriched_count} underlying enriched")
     
     return resolved_count
+
+
+def fetch_sector_info_for_underlying_holdings_with_tracking(holding, processed_so_far: int, total_underlying: int) -> int:
+    """
+    Fetch sector/geography info for all underlying holdings with progress tracking
+    
+    Returns count of successfully enriched holdings
+    """
+    from app.services.stock_info_service import get_stock_info, StockInfoService
+    from app.services.resolution_tracker import update_progress, log_error
+    
+    if not holding.underlying_holdings_list:
+        logger.debug(f"No underlying holdings for {holding.symbol}")
+        return 0
+    
+    # Get the service to check cache
+    service = StockInfoService()
+    
+    try:
+        underlying_list = holding.underlying_holdings_list
+        total_in_holding = len(underlying_list)
+        
+        logger.info(f"Processing {total_in_holding} underlying holdings in {holding.symbol}")
+        
+        enriched_count = 0
+        
+        for idx, underlying in enumerate(underlying_list, 1):
+            symbol = underlying['symbol']
+            global_idx = processed_so_far + idx
+            
+            # Check if already has sector data
+            existing_sector = underlying.get('sector')
+            if existing_sector and existing_sector not in [None, 'Unknown', '', 'NOT SET']:
+                enriched_count += 1
+                update_progress('underlying_info', 
+                              symbol=f"{holding.symbol} → {symbol} (cached)",
+                              underlying_processed=global_idx,
+                              cached=True)
+                continue
+            
+            # Check if in cache (no API call needed)
+            is_cached = symbol in service.cache
+            
+            update_progress('underlying_info', 
+                          symbol=f"{holding.symbol} → {symbol}",
+                          underlying_processed=global_idx,
+                          cached=is_cached)
+            
+            stock_info = get_stock_info(symbol)
+            
+            if stock_info:
+                underlying['sector'] = stock_info.get('sector', 'Unknown')
+                underlying['industry'] = stock_info.get('industry', 'Unknown')
+                underlying['country'] = stock_info.get('country', 'Unknown')
+                underlying['geography'] = stock_info.get('geography', 'Unknown')
+                enriched_count += 1
+            else:
+                underlying['sector'] = 'Unknown'
+                underlying['industry'] = 'Unknown'
+                underlying['country'] = 'Unknown'
+                underlying['geography'] = 'Unknown'
+                log_error(symbol, f"No info returned (underlying of {holding.symbol})")
+        
+        # Save updated underlying holdings
+        holding.underlying_holdings = json.dumps(underlying_list)
+        
+        logger.info(f"Completed {holding.symbol}: enriched {enriched_count}/{total_in_holding}")
+        return enriched_count
+        
+    except Exception as e:
+        logger.error(f"Error enriching underlying holdings for {holding.symbol}: {e}")
+        logger.exception(e)
+        log_error(holding.symbol, f"Error enriching underlying: {str(e)}")
+        return 0
 
 
 def resolve_all_unresolved_holdings() -> int:

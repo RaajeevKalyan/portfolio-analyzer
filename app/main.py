@@ -224,6 +224,24 @@ def register_routes(app):
     def health():
         """Health check endpoint for Docker"""
         return {'status': 'healthy', 'service': 'portfolio-analyzer'}, 200
+    
+    @app.route('/favicon.ico')
+    def favicon():
+        """Return empty favicon to prevent 404 errors"""
+        return '', 204  # No content
+    
+    # Suppress noisy 404 logging for common missing assets
+    @app.errorhandler(404)
+    def handle_404(e):
+        """Handle 404 errors quietly for static assets"""
+        from flask import request
+        # Don't log 404s for common static asset requests
+        ignored_paths = ['/favicon.ico', '/apple-touch-icon', '/robots.txt', '/sitemap.xml']
+        if any(request.path.startswith(p) for p in ignored_paths):
+            return '', 404
+        # For actual page 404s, return a proper error page
+        print(f"404 Not Found: {request.path}", file=sys.stderr)
+        return f"<h1>404 Not Found</h1><p>The requested URL {request.path} was not found.</p>", 404
 
     @app.route('/api/holdings/underlying/<symbol>')
     def get_underlying_holdings(symbol):
@@ -379,11 +397,29 @@ def register_routes(app):
                 resolved_holdings = session.query(Holding).filter(
                     Holding.info_fetched == True
                 ).count()
+                
+                # Count total underlying symbols that need processing
+                total_underlying = 0
+                resolved_etfs = session.query(Holding).filter(
+                    Holding.asset_type.in_(['etf', 'mutual_fund']),
+                    Holding.underlying_parsed == True
+                ).all()
+                
+                for etf in resolved_etfs:
+                    if etf.underlying_holdings_list:
+                        total_underlying += len(etf.underlying_holdings_list)
             
             is_resolving = resolution_status.get('is_running', False) or (unresolved > 0) or (etf_mf_unresolved > 0)
             
-            # Calculate progress percentage
-            progress_pct = (resolved_holdings / total_holdings * 100) if total_holdings > 0 else 100
+            # Get progress from tracker (more accurate)
+            tracker_progress = resolution_status.get('progress_percentage', 0)
+            tracker_remaining = resolution_status.get('total_remaining', unresolved + total_underlying)
+            
+            # Calculate progress percentage (use tracker value if available, else compute)
+            if resolution_status.get('is_running'):
+                progress_pct = tracker_progress
+            else:
+                progress_pct = (resolved_holdings / total_holdings * 100) if total_holdings > 0 else 100
             
             return jsonify({
                 'is_resolving': is_resolving,
@@ -398,7 +434,16 @@ def register_routes(app):
                 'current_symbol': resolution_status.get('current_symbol', None),
                 'current_step': resolution_status.get('current_step', None),
                 'started_at': resolution_status.get('started_at', None),
-                'last_update': resolution_status.get('last_update', None)
+                'last_update': resolution_status.get('last_update', None),
+                # NEW: Detailed tracking from resolution_tracker
+                'parent_symbols_total': resolution_status.get('parent_symbols_total', total_holdings),
+                'parent_symbols_processed': resolution_status.get('parent_symbols_processed', resolved_holdings),
+                'underlying_symbols_total': resolution_status.get('underlying_symbols_total', total_underlying),
+                'underlying_symbols_processed': resolution_status.get('underlying_symbols_processed', 0),
+                'total_remaining': tracker_remaining,
+                'cached_hits': resolution_status.get('cached_hits', 0),
+                'api_calls': resolution_status.get('api_calls', 0),
+                'elapsed_time': resolution_status.get('elapsed_time', None)
             })
             
         except ImportError:
