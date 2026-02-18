@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/broker-cards.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/holdings.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/risk.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fund-analysis.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modals.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/progress.css') }}">
 </head>
@@ -233,6 +234,16 @@
                 </div>
             </section>
             
+            <!-- Fund Expense Analysis Section -->
+            <section class="fund-analysis-section">
+                <div id="fundAnalysisContainer">
+                    <div class="fund-analysis-loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading fund analysis...</p>
+                    </div>
+                </div>
+            </section>
+            
             <!-- Risk Analysis Section -->
             <section class="risk-section">
                 <div class="risk-header">
@@ -380,6 +391,7 @@
     <script src="{{ url_for('static', filename='js/broker-cards.js') }}"></script>
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/fund-analysis.js') }}"></script>
     
     <!-- Page Initialization -->
     <script>
