@@ -1,0 +1,206 @@
+/* =============================================================================
+   layout.css - Header, Navigation, Net Worth Bar, Page Grid
+   ============================================================================= */
+
+/* Header */
+.header {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+    padding: var(--spacing-md) 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.header-brand .logo {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+}
+
+.header-brand h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.header-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.header-btn {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+}
+
+.header-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Net Worth Bar */
+.net-worth-bar {
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    padding: var(--spacing-lg) 0;
+    color: white;
+}
+
+.net-worth-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+.net-worth-spacer {
+    flex: 1;
+}
+
+.net-worth-breakdown {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+/* Unified box style for net worth, investments, cash */
+.net-worth-box {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 140px;
+}
+
+.net-worth-box.primary {
+    background: rgba(255, 255, 255, 0.25);
+    min-width: 200px;
+}
+
+.net-worth-box.cash {
+    background: rgba(16, 185, 129, 0.3);
+}
+
+.net-worth-box .box-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.9;
+    margin-bottom: var(--spacing-xs);
+}
+
+.net-worth-box .box-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.net-worth-box.primary .box-value {
+    font-size: 1.8rem;
+}
+
+.net-worth-box .box-pct {
+    font-size: 0.8rem;
+    opacity: 0.85;
+    margin-top: var(--spacing-xs);
+}
+
+/* Main Content Grid */
+.main-content {
+    padding: var(--spacing-xl) 0;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
+/* Section Headers */
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-lg);
+}
+
+.section-header h2 {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.section-header h2 i {
+    color: var(--primary-color);
+}
+
+/* Section Spacing */
+.broker-section {
+    margin-bottom: var(--spacing-xl);
+}
+
+.holdings-section {
+    margin-bottom: var(--spacing-xl);
+}
+
+.risk-section {
+    margin-bottom: var(--spacing-xl);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .net-worth-content {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .net-worth-spacer {
+        display: none;
+    }
+    
+    .net-worth-breakdown {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .net-worth-box {
+        flex: 1;
+        min-width: auto;
+    }
+    
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}

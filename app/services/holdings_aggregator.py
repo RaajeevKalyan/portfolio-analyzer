@@ -155,10 +155,15 @@ class HoldingsAggregator:
             if data['total_quantity'] > 0:
                 data['average_price'] = data['total_value'] / data['total_quantity']
             
+            # Calculate allocation as percentage (0-100, not 0-1)
             if total_portfolio_value > 0:
-                data['allocation_pct'] = float(data['total_value'] / total_portfolio_value)
+                data['allocation_pct'] = float(data['total_value'] / total_portfolio_value * 100)
             else:
                 data['allocation_pct'] = 0.0
+            
+            # Also store price for template compatibility
+            data['price'] = data['average_price']
+            data['quantity'] = data['total_quantity']
             
             result.append(data)
         

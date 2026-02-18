@@ -1,0 +1,258 @@
+/* =============================================================================
+   risk.css - Risk Analysis Section Styles
+   ============================================================================= */
+
+/* Risk Section */
+.risk-section {
+    margin-top: var(--spacing-xl);
+}
+
+.risk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.risk-header h2 {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.risk-header h2 i {
+    color: var(--primary-color);
+}
+
+.overall-risk {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.9rem;
+}
+
+.overall-risk .label {
+    color: var(--text-secondary);
+}
+
+.overall-risk .value {
+    font-weight: 600;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-full);
+}
+
+.overall-risk .value.low {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success-color);
+}
+
+.overall-risk .value.medium {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning-color);
+}
+
+.overall-risk .value.high {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger-color);
+}
+
+/* Risk Cards Grid */
+.risk-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-lg);
+}
+
+@media (max-width: 1024px) {
+    .risk-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .risk-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Risk Card */
+.risk-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.risk-card-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.risk-card-header i {
+    color: var(--primary-color);
+}
+
+.risk-card-body {
+    padding: var(--spacing-lg);
+    min-height: 250px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Chart Container */
+.chart-container {
+    flex: 1;
+    position: relative;
+    min-height: 180px;
+}
+
+.chart-container canvas {
+    max-height: 180px;
+}
+
+/* Chart Legend */
+.chart-legend {
+    margin-top: var(--spacing-md);
+}
+
+.chart-legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
+    font-size: 0.85rem;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+
+.legend-label {
+    flex: 1;
+    color: var(--text-primary);
+}
+
+.legend-value {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+/* Concentration Items */
+.concentration-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.concentration-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+}
+
+.concentration-symbol {
+    font-weight: 600;
+    min-width: 60px;
+}
+
+.concentration-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--border-light);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.concentration-bar-fill {
+    height: 100%;
+    background: var(--danger-color);
+    border-radius: var(--radius-full);
+}
+
+.concentration-value {
+    font-weight: 500;
+    min-width: 50px;
+    text-align: right;
+    color: var(--danger-color);
+}
+
+/* Warning Alert in Concentration */
+.concentration-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.concentration-warning i {
+    color: var(--danger-color);
+    margin-top: 2px;
+}
+
+.concentration-warning-text {
+    font-size: 0.85rem;
+    color: var(--danger-color);
+}
+
+/* Sector Bar Chart */
+.sector-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.sector-bar-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.sector-bar-label {
+    min-width: 120px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sector-bar-track {
+    flex: 1;
+    height: 20px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.sector-bar-fill {
+    height: 100%;
+    background: var(--primary-color);
+    border-radius: var(--radius-sm);
+    transition: width var(--transition-normal);
+}
+
+.sector-bar-fill.warning {
+    background: var(--danger-color);
+}
+
+.sector-bar-value {
+    min-width: 45px;
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}

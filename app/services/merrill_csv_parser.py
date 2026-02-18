@@ -238,6 +238,62 @@ class MerrillCSVParser(CSVParserBase):
         
         return None
     
+    def extract_export_timestamp(self, file_path: str) -> Optional[str]:
+        """
+        Extract the export timestamp from Merrill Lynch CSV header
+        
+        The CSV typically starts with a line like:
+        Exported on: 01/25/2026 11:51 AM ET  Selected account(s):...
+        
+        Args:
+            file_path: Path to the CSV file
+            
+        Returns:
+            str: ISO format timestamp string, or None if not found
+        """
+        try:
+            from datetime import datetime
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                # Read first few lines to find the export timestamp
+                for _ in range(10):  # Check first 10 lines
+                    line = f.readline()
+                    if not line:
+                        break
+                    
+                    # Look for "Exported on:" pattern
+                    if 'Exported on:' in line or 'exported on:' in line.lower():
+                        # Extract the date/time portion
+                        # Pattern: "Exported on: 01/25/2026 11:51 AM ET"
+                        match = re.search(r'Exported on:\s*(\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}\s*(?:AM|PM)?)', line, re.IGNORECASE)
+                        if match:
+                            date_str = match.group(1).strip()
+                            # Try to parse with various formats
+                            for fmt in ['%m/%d/%Y %I:%M %p', '%m/%d/%Y %H:%M', '%m/%d/%Y']:
+                                try:
+                                    dt = datetime.strptime(date_str, fmt)
+                                    logger.info(f"Extracted export timestamp: {dt.isoformat()}")
+                                    return dt.isoformat()
+                                except ValueError:
+                                    continue
+                        
+                        # Try simpler date extraction
+                        date_match = re.search(r'(\d{1,2}/\d{1,2}/\d{4})', line)
+                        if date_match:
+                            try:
+                                dt = datetime.strptime(date_match.group(1), '%m/%d/%Y')
+                                logger.info(f"Extracted export date: {dt.isoformat()}")
+                                return dt.isoformat()
+                            except ValueError:
+                                pass
+            
+            logger.warning("Could not extract export timestamp from CSV")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error extracting export timestamp: {e}")
+            return None
+    
     def parse_csv(self, file_path: str) -> Dict:
         """
         Parse Merrill Lynch CSV file
@@ -250,10 +306,14 @@ class MerrillCSVParser(CSVParserBase):
                 'account_number_last4': str,
                 'total_value': Decimal,
                 'holdings': List[Dict],
-                'cash_holdings': List[Dict],  # NEW: Separate list for cash
-                'total_cash': Decimal  # NEW: Total cash value
+                'cash_holdings': List[Dict],
+                'total_cash': Decimal,
+                'export_timestamp': str (ISO format) or None
             }
         """
+        # Extract export timestamp BEFORE preprocessing (needs raw file)
+        export_timestamp = self.extract_export_timestamp(file_path)
+        
         # Preprocess and load CSV
         df = self._preprocess_merrill_csv(file_path)
         
@@ -302,7 +362,8 @@ class MerrillCSVParser(CSVParserBase):
             'cash_holdings': cash_holdings,
             'total_cash': total_cash,
             'investment_holdings': holdings,
-            'total_investments': total_value - total_cash
+            'total_investments': total_value - total_cash,
+            'export_timestamp': export_timestamp
         }
     
     def _map_columns(self, df: pd.DataFrame) -> Optional[Dict[str, str]]:

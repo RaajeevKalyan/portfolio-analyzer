@@ -14,3115 +14,390 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     
-    <style>
-        /* Theme Variables */
-        :root[data-theme="light"] {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f8f9fa;
-            --bg-card: #ffffff;
-            --text-primary: #2d3748;
-            --text-secondary: #718096;
-            --text-muted: #a0aec0;
-            --border-color: #e2e8f0;
-            --shadow: 0 4px 6px rgba(0,0,0,0.1);
-            --gradient-start: #667eea;
-            --gradient-end: #764ba2;
-        }
-        
-        :root[data-theme="dark"] {
-            --bg-primary: #1a202c;
-            --bg-secondary: #2d3748;
-            --bg-card: #2d3748;
-            --text-primary: #f7fafc;
-            --text-secondary: #cbd5e0;
-            --text-muted: #718096;
-            --border-color: #4a5568;
-            --shadow: 0 4px 6px rgba(0,0,0,0.3);
-            --gradient-start: #667eea;
-            --gradient-end: #764ba2;
-        }
-        
-        body {
-            background-color: var(--bg-secondary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            transition: background-color 0.3s, color 0.3s;
-        }
-        
-        .navbar {
-            background-color: var(--bg-primary);
-            box-shadow: var(--shadow);
-            padding: 1rem 0;
-            transition: background-color 0.3s;
-        }
-        
-        .navbar-brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            text-decoration: none;
-            transition: transform 0.2s;
-        }
-        
-        .navbar-brand:hover {
-            transform: translateY(-2px);
-            color: var(--text-primary);
-        }
-        
-        .logo-icon {
-            width: 45px;
-            height: 45px;
-            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.4rem;
-            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
-        }
-        
-        .theme-toggle-btn {
-            background: var(--bg-card);
-            border: 2px solid var(--border-color);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-            color: var(--text-primary);
-        }
-        
-        .theme-toggle-btn:hover {
-            transform: rotate(180deg);
-            border-color: var(--gradient-start);
-            box-shadow: var(--shadow);
-        }
-        
-        .theme-icon {
-            font-size: 1.1rem;
-        }
-        
-        .net-worth-bar {
-            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-            color: white;
-            padding: 1.5rem 0;
-            box-shadow: var(--shadow);
-        }
-        
-        .net-worth-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1.5rem;
-        }
-
-        .net-worth-main {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .net-worth-breakdown {
-            display: flex;
-            gap: 2rem;
-            align-items: center;
-        }
-
-        .breakdown-item {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            padding: 0.5rem 1rem;
-            background: rgba(255,255,255,0.15);
-            border-radius: 8px;
-        }
-
-        .breakdown-label {
-            font-size: 0.75rem;
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .breakdown-value {
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        .breakdown-pct {
-            font-size: 0.8rem;
-            opacity: 0.85;
-        }     
-
-        .net-worth-label {
-            font-size: 0.9rem;
-            opacity: 0.9;
-            font-weight: 500;
-        }
-        
-        .net-worth-value {
-            font-size: 2rem;
-            font-weight: bold;
-        }
-        
-        .broker-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-        @media (max-width: 1400px) {
-            .broker-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
-
-        @media (max-width: 1024px) {
-            .broker-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 640px) {
-            .broker-grid {
-                grid-template-columns: 1fr;
-            }
-        }        
-        
-        .broker-card {
-            background: var(--bg-card);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-            transition: all 0.3s;
-        }
-        
-        .broker-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-        }
-        
-        .broker-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .broker-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .broker-icon-circle {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: white;
-        }
-        
-        .broker-icon-circle.merrill { background: linear-gradient(135deg, #CC0000, #990000); }
-        .broker-icon-circle.fidelity { background: linear-gradient(135deg, #00783E, #005530); }
-        .broker-icon-circle.webull { background: linear-gradient(135deg, #5B21B6, #4C1D95); }
-        .broker-icon-circle.robinhood { background: linear-gradient(135deg, #00C805, #009604); }
-        .broker-icon-circle.schwab { background: linear-gradient(135deg, #00A0DC, #0077A8); }
-        .broker-icon-circle.ally { background: linear-gradient(135deg, #6B2C91, #552370); }
-        .broker-icon-circle.etrade { background: linear-gradient(135deg, #6633CC, #4D2699); }
-        .broker-icon-circle.wellsfargo { background: linear-gradient(135deg, #D71E28, #A01820); }
-        
-        .broker-name-section h3 {
-            margin: 0;
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-        
-        .broker-name-section .account-info {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            margin-top: 0.25rem;
-        }
-        
-        .broker-value-badge {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--text-primary);
-        }
-        
-        .broker-tabs {
-            display: flex;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .broker-tab {
-            flex: 1;
-            padding: 1rem;
-            text-align: center;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s;
-            color: var(--text-secondary);
-            font-weight: 500;
-            background: none;
-            border: none;
-            width: 100%;
-        }
-        
-        .broker-tab:hover {
-            background: var(--bg-secondary);
-        }
-        
-        .broker-tab.active {
-            color: var(--gradient-start);
-            border-bottom-color: var(--gradient-start);
-            background: var(--bg-secondary);
-        }
-        
-        .tab-content-area {
-            padding: 1.5rem;
-            min-height: 300px;
-        }
-        
-        .tab-pane {
-            display: none;
-        }
-        
-        .tab-pane.active {
-            display: block;
-        }
-        
-        .chart-container {
-            position: relative;
-            height: 250px;
-        }
-        
-        .snapshots-table {
-            width: 100%;
-            margin-bottom: 1rem;
-        }
-        
-        .snapshots-table th {
-            color: var(--text-secondary);
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            padding-bottom: 0.75rem;
-            border-bottom: 2px solid var(--border-color);
-        }
-        
-        .snapshots-table td {
-            padding: 0.75rem 0;
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-primary);
-        }
-        
-        .snapshots-table tr:last-child td {
-            border-bottom: none;
-        }
-        
-        .snapshot-date {
-            font-weight: 600;
-        }
-        
-        .snapshot-positions {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-        
-        .snapshot-value {
-            font-weight: 600;
-            text-align: right;
-        }
-        
-        .upload-zone {
-            border: 2px dashed var(--border-color);
-            border-radius: 8px;
-            padding: 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: var(--bg-secondary);
-        }
-        
-        .upload-zone:hover {
-            border-color: var(--gradient-start);
-            background: rgba(102, 126, 234, 0.05);
-        }
-        
-        .upload-icon {
-            font-size: 3rem;
-            color: var(--text-muted);
-            margin-bottom: 1rem;
-        }
-        
-        .btn-upload {
-            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-            border: none;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-        }
-        
-        .btn-upload:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-            color: white;
-        }
-        
-        .btn-view-all {
-            background: var(--bg-card);
-            border: 2px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 0.5rem 1.5rem;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            width: 100%;
-        }
-        
-        .btn-view-all:hover {
-            border-color: var(--gradient-start);
-            color: var(--gradient-start);
-            transform: translateY(-2px);
-        }
-        
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            width: 420px;
-            max-width: calc(100vw - 40px);
-        }
-        
-        .custom-toast {
-            background: var(--bg-card);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            margin-bottom: 1rem;
-            overflow: hidden;
-            animation: slideIn 0.3s ease-out;
-            border-left: 5px solid;
-        }
-        
-        @keyframes slideIn {
-            from { transform: translateX(450px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        
-        .custom-toast.toast-success { border-left-color: #10b981; }
-        .custom-toast.toast-error { border-left-color: #ef4444; }
-        
-        .toast-header-custom {
-            display: flex;
-            align-items: flex-start;
-            padding: 1.25rem;
-            gap: 1rem;
-        }
-        
-        .toast-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-            flex-shrink: 0;
-        }
-        
-        .toast-success .toast-icon { background-color: #d1fae5; color: #10b981; }
-        .toast-error .toast-icon { background-color: #fee2e2; color: #ef4444; }
-        
-        .toast-content {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .toast-title {
-            font-weight: 600;
-            font-size: 1rem;
-            color: var(--text-primary);
-            margin: 0 0 0.375rem 0;
-        }
-        
-        .toast-message {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin: 0;
-            line-height: 1.5;
-        }
-        
-        .toast-close {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            font-size: 1.25rem;
-            cursor: pointer;
-            padding: 0;
-            width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            transition: all 0.2s;
-            flex-shrink: 0;
-        }
-        
-        .toast-close:hover {
-            background-color: var(--bg-secondary);
-            color: var(--text-primary);
-        }
-
-        /* Holdings Section */
-        .holdings-section {
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: var(--shadow);
-            margin-bottom: 3rem;
-        }
-
-        .holdings-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        .holdings-header h2 {
-            margin: 0;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .holdings-filters {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .filter-select, .filter-search {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            transition: all 0.3s;
-        }
-
-        .filter-select:focus, .filter-search:focus {
-            outline: none;
-            border-color: var(--gradient-start);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .filter-search {
-            min-width: 200px;
-        }
-
-        .holdings-table-container {
-            overflow-x: auto;
-        }
-
-        .holdings-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .holdings-table thead th {
-            background: var(--bg-secondary);
-            color: var(--text-secondary);
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 2px solid var(--border-color);
-        }
-
-        .holdings-table tbody tr.holding-row {
-            border-bottom: 1px solid var(--border-color);
-            transition: background-color 0.2s;
-        }
-
-        .holdings-table tbody tr.holding-row:hover {
-            background: var(--bg-secondary);
-        }
-
-        .holdings-table tbody tr.holding-row.expandable {
-            cursor: pointer;
-        }
-
-        .holdings-table td {
-            padding: 1rem;
-            color: var(--text-primary);
-            vertical-align: middle;
-        }
-
-        .symbol-cell {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .expand-icon {
-            color: var(--text-muted);
-            font-size: 0.75rem;
-            transition: transform 0.3s;
-            width: 12px;
-        }
-
-        .expand-icon.rotated {
-            transform: rotate(90deg);
-        }
-
-        .symbol-text {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .badge-fund {
-            background: rgba(102, 126, 234, 0.15);
-            color: var(--gradient-start);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            font-weight: 600;
-        }
-
-        .holding-name {
-            color: var(--text-secondary);
-            font-size: 0.95rem;
-        }
-
-        .quantity-value, .value-amount {
-            font-weight: 500;
-        }
-
-        .allocation-display {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .allocation-bar-bg {
-            flex: 1;
-            height: 8px;
-            background: var(--bg-secondary);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .allocation-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
-            transition: width 0.3s;
-        }
-
-        .allocation-percent {
-            font-weight: 600;
-            min-width: 50px;
-            text-align: right;
-        }
-
-        /* Broker breakdown row */
-        .broker-breakdown-row {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .breakdown-content {
-            padding: 1rem 2rem 1rem 3rem;
-        }
-
-        .broker-details {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .broker-line {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .broker-line i {
-            color: var(--text-muted);
-            font-size: 0.8rem;
-        }
-
-        .broker-name {
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .broker-qty {
-            color: var(--text-secondary);
-        }
-
-        .broker-value {
-            color: var(--text-secondary);
-            margin-left: auto;
-        }
-
-        .underlying-section {
-            border-top: 1px solid var(--border-color);
-            padding-top: 1rem;
-        }
-
-        .underlying-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-
-        .underlying-header i {
-            color: var(--gradient-start);
-        }
-
-        .btn-expand-underlying {
-            margin-left: auto;
-            background: none;
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 0.4rem 0.75rem;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-expand-underlying:hover {
-            border-color: var(--gradient-start);
-            color: var(--gradient-start);
-        }
-
-        .underlying-status {
-            margin-top: 0.5rem;
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
-        .no-holdings {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: var(--text-muted);
-        }
-
-        .no-holdings i {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-
-        .no-holdings p {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        /* Modal Overlay */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            padding: 2rem;
-            overflow-y: auto;
-        }
-        .modal-overlay.show {
-            display: flex;
-        }
-
-        .modal-container {
-            background: var(--bg-card);
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 1200px;  /* INCREASED from 900px */
-            width: 95%;         /* Use more screen width */
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-            margin: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            padding: 1.5rem 2rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .modal-title {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .modal-title i {
-            color: var(--gradient-start);
-            margin-right: 0.5rem;
-        }
-
-        .modal-title span:first-child {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .modal-subtitle {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-left: 2rem;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            font-size: 1.5rem;
-            cursor: pointer;
-            padding: 0;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            transition: all 0.2s;
-        }
-
-        .modal-close:hover {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-        }
-
-        .modal-summary {
-            display: flex;
-            gap: 2rem;
-            padding: 1.5rem 2rem;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .summary-item {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .summary-label {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            font-weight: 500;
-        }
-
-        .summary-value {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .modal-filters {
-            display: flex;
-            gap: 1rem;
-            padding: 1rem 2rem;
-            border-bottom: 1px solid var(--border-color);
-            align-items: center;
-        }
-
-        .modal-search {
-            flex: 1;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-        }
-
-        .modal-search:focus {
-            outline: none;
-            border-color: var(--gradient-start);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .modal-filter-right {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .checkbox-label input[type="checkbox"] {
-            cursor: pointer;
-        }
-
-        .modal-body {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0;
-            min-height: 300px;
-        }
-
-        .underlying-table-wrapper {
-            max-height: none;
-            overflow-y: visible;
-        }
-
-        .underlying-table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
-        }
-
-        .underlying-table th:nth-child(1) { width: 10%; }  /* Symbol */
-        .underlying-table th:nth-child(2) { width: 25%; }  /* Name */
-        .underlying-table th:nth-child(3) { width: 10%; }  /* Weight */
-        .underlying-table th:nth-child(4) { width: 12%; }  /* Est. Value */
-        .underlying-table th:nth-child(5) { width: 15%; }  /* Sector */
-        .underlying-table th:nth-child(6) { width: 12%; }  /* Country */
-        .underlying-table th:nth-child(7) { width: 16%; }  /* Overlap */        
-
-        .underlying-table thead th {
-            background: var(--bg-secondary);
-            color: var(--text-secondary);
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            padding: 0.75rem;
-            text-align: left;
-            border-bottom: 2px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        .underlying-table tbody tr {
-            border-bottom: 1px solid var(--border-color);
-            transition: background-color 0.2s;
-        }
-
-        .underlying-table tbody tr:hover {
-            background: var(--bg-secondary);
-        }
-
-        .underlying-table tbody tr.has-overlap {
-            background: rgba(239, 68, 68, 0.05);
-        }
-
-        .underlying-table td {
-            padding: 0.75rem 1rem;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* Allow name column to wrap if needed */
-        .underlying-table td:nth-child(2) {
-            white-space: normal;
-            word-wrap: break-word;
-        }
-
-        .underlying-symbol {
-            font-weight: 600;
-            font-size: 1rem;
-        }
-
-        .underlying-name {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            display: block;
-            max-width: 100%;
-        }
-
-        .weight-value {
-            font-weight: 500;
-        }
-
-        .overlap-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
-            padding: 0.25rem 0.75rem;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        .overlap-badge i {
-            font-size: 0.9rem;
-        }
-
-        .underlying-empty {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: var(--text-muted);
-        }
-
-        .underlying-empty i {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-
-        .underlying-empty p {
-            font-size: 1.1rem;
-            font-weight: 500;
-        }
-
-        .modal-footer {
-            padding: 1rem 2rem;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: flex-end;
-        }
-
-        .btn-secondary {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 0.5rem 1.5rem;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--gradient-start);
-            color: var(--gradient-start);
-        }
-
-        /* Scrollbar styling for modal */
-        .modal-body::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .modal-body::-webkit-scrollbar-track {
-            background: var(--bg-secondary);
-        }
-
-        .modal-body::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 4px;
-        }
-
-        .modal-body::-webkit-scrollbar-thumb:hover {
-            background: var(--text-muted);
-        }
-
-        /* Risk Analysis Section */
-        .risk-analysis-section {
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: var(--shadow);
-            margin-bottom: 3rem;
-        }
-
-        .risk-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        .risk-header h2 {
-            margin: 0;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .risk-header h2 i {
-            color: var(--gradient-start);
-            margin-right: 0.5rem;
-        }
-
-        .risk-level-badge {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            background: var(--bg-secondary);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-        }
-
-        .risk-label {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-
-        .risk-value {
-            font-weight: 600;
-            font-size: 1rem;
-        }
-
-        .risk-value.low {
-            color: #10b981;
-        }
-
-        .risk-value.medium {
-            color: #f59e0b;
-        }
-
-        .risk-value.high {
-            color: #ef4444;
-        }
-
-        .risk-cards-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .risk-card {
-            background: var(--bg-secondary);
-            border-radius: 10px;
-            padding: 1.5rem;
-            border: 1px solid var(--border-color);
-        }
-
-        .risk-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .risk-card-header h3 {
-            margin: 0;
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .risk-card-header h3 i {
-            color: var(--gradient-start);
-            font-size: 0.9rem;
-        }
-
-        .risk-card-body {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .chart-container-risk {
-            position: relative;
-            height: 200px;
-        }
-
-        .risk-warnings {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .warning-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem;
-            background: var(--bg-card);
-            border-radius: 6px;
-            font-size: 0.85rem;
-        }
-
-        .warning-item i {
-            color: #ef4444;
-        }
-
-        .warning-item.no-warning {
-            color: var(--text-muted);
-        }
-
-        .warning-item.no-warning i {
-            color: #10b981;
-        }
-
-        .sector-legend, .geography-stats {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .legend-item, .stat-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem;
-            background: var(--bg-card);
-            border-radius: 6px;
-            font-size: 0.85rem;
-        }
-
-        .legend-color {
-            width: 12px;
-            height: 12px;
-            border-radius: 2px;
-            margin-right: 0.5rem;
-        }
-
-        .legend-label {
-            display: flex;
-            align-items: center;
-            color: var(--text-primary);
-        }
-
-        .legend-value, .stat-value {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .overlap-alert {
-            background: rgba(239, 68, 68, 0.05);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            border-radius: 10px;
-            padding: 1.5rem;
-            margin-top: 1.5rem;
-        }
-
-        .overlap-alert-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            color: #ef4444;
-            font-size: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .overlap-alert-header i {
-            font-size: 1.2rem;
-        }
-
-        .overlap-alert-body {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .overlap-item {
-            background: var(--bg-card);
-            padding: 1rem;
-            border-radius: 6px;
-            border-left: 3px solid #ef4444;
-        }
-
-        .overlap-funds {
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 0.25rem;
-        }
-
-        .overlap-percentage {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .overlap-recommendation {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            margin-top: 0.5rem;
-            font-style: italic;
-        }
-
-        @media (max-width: 1024px) {
-            .risk-cards-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Settings Button */
-        .settings-btn {
-            background: var(--bg-card);
-            border: 2px solid var(--border-color);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-            color: var(--text-primary);
-        }
-
-        .settings-btn:hover {
-            transform: scale(1.05);
-            border-color: var(--gradient-start);
-            box-shadow: var(--shadow);
-        }
-
-        /* Settings Modal */
-        .settings-modal {
-            max-width: 600px;
-        }
-
-        .settings-section {
-            padding: 1.5rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .settings-section:last-child {
-            border-bottom: none;
-        }
-
-        .settings-section h4 {
-            margin: 0 0 0.5rem 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .settings-description {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-        }
-
-        .setting-item label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.75rem;
-        }
-
-        .setting-label {
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .setting-current {
-            font-weight: 600;
-            color: var(--gradient-start);
-            font-size: 1.1rem;
-        }
-
-        .slider-container input[type="range"] {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: var(--bg-secondary);
-            outline: none;
-            -webkit-appearance: none;
-        }
-
-        .slider-container input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .slider-container input[type="range"]::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-            cursor: pointer;
-            border: none;
-        }
-
-        .slider-labels {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 0.5rem;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-            border: none;
-            color: white;
-            padding: 0.5rem 1.5rem;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-        
-        /* Progress Indicator */
-        .resolution-progress {
-            margin-bottom: 2rem;
-            animation: slideDown 0.3s ease-out;
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .progress-card {
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: var(--shadow);
-            border-left: 4px solid var(--gradient-start);
-        }
-
-        .progress-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-            font-weight: 600;
-            font-size: 1.1rem;
-        }
-
-        .progress-header i {
-            color: var(--gradient-start);
-        }
-
-        .progress-stats {
-            display: flex;
-            gap: 2rem;
-            margin-bottom: 0.75rem;
-            flex-wrap: wrap;
-        }
-
-        .stat {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .stat-label {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            font-weight: 500;
-        }
-
-        .stat-value {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .progress-message {
-            margin-top: 0.75rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid var(--border-color);
-        }
-
-        .progress-message small {
-            color: var(--text-muted);
-            font-style: italic;
-        }
-
-        .progress-header .current-symbol {
-            margin-left: auto;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            font-weight: normal;
-            max-width: 300px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .progress-bar-container {
-            width: 100%;
-            height: 8px;
-            background: var(--bg-secondary);
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 1rem 0;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
-            transition: width 0.5s ease;
-            border-radius: 4px;
-        }
-        /* end Progress Indicator */
-        .sector-badge, .country-badge {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            background: var(--bg-secondary);
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-        }
-
-        .broker-toggles {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .broker-toggle-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem;
-            background: var(--bg-card);
-            border-radius: 6px;
-        }
-
-        .toggle-label {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            cursor: pointer;
-        }
-
-        .broker-visibility-toggle {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .broker-visibility-toggle:disabled {
-            cursor: not-allowed;
-            opacity: 0.5;
-        }
-
-        .toggle-text {
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .broker-status {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-style: italic;
-        }
-        /* Chart legends */
-        .chart-legend,
-        .sector-legend {
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--border-color);
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .chart-legend-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.25rem 0;
-        }
-
-        .legend-color {
-            width: 16px;
-            height: 16px;
-            border-radius: 3px;
-            flex-shrink: 0;
-        }
-
-        .legend-label {
-            flex: 1;
-            font-size: 0.9rem;
-            color: var(--text-primary);
-        }
-
-        .legend-value {
-            font-weight: 600;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-        }
-        /* modal table changes */
-        .underlying-table-wrapper {
-            max-height: 500px;
-            overflow-y: auto;
-            overflow-x: hidden;
-            position: relative;
-        }
-
-        /* Ensure table takes full width */
-        .underlying-table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: auto;
-        }
-
-        /* Make header sticky */
-        .underlying-table thead th {
-            position: sticky;
-            top: 0;
-            background: var(--bg-card);
-            z-index: 10;
-            border-bottom: 2px solid var(--border-color);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Ensure body displays normally */
-        .underlying-table tbody {
-            display: table-row-group;
-        }
-
-        .underlying-table thead {
-            display: table-header-group;
-        }
-
-        .underlying-table tr {
-            display: table-row;
-        }
-
-        .underlying-table th,
-        .underlying-table td {
-            display: table-cell;
-        }
-
-        /* Cash Badge styling */
-        .badge-cash {
-            background: rgba(16, 185, 129, 0.15);
-            color: #10b981;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            font-weight: 600;
-        }
-
-        /* Cash row styling */
-        .holdings-table tbody tr.holding-row.cash-row {
-            background: rgba(16, 185, 129, 0.05);
-        }
-
-        .holdings-table tbody tr.holding-row.cash-row:hover {
-            background: rgba(16, 185, 129, 0.1);
-        }
-
-        .allocation-bar-fill.cash {
-            background: linear-gradient(90deg, #10b981, #059669);
-        }
-   
-    </style>
+    <!-- Application CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/broker-cards.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/holdings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/risk.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/progress.css') }}">
 </head>
 <body>
-    <nav class="navbar">
+    <!-- Server Data Injection (for external JS access) -->
+    <script id="page-data" type="application/json">
+        {
+            "riskMetrics": {{ risk_metrics|tojson|safe }},
+            "brokers": {{ brokers|tojson|safe }},
+            "totalNetWorth": {{ total_net_worth|default(0) }}
+        }
+    </script>
+    
+    <!-- Header -->
+    <header class="header">
         <div class="container">
-            <a class="navbar-brand" href="/">
-                <div class="logo-icon">
-                    <i class="fas fa-chart-pie"></i>
-                </div>
-                <span>Portfolio Risk Analyzer</span>
-            </a>
-            <div class="ms-auto d-flex gap-2 align-items-center">
-                <!-- Settings Button -->
-                <button class="settings-btn" onclick="openRiskSettings()" title="Risk Analysis Settings">
-                    <i class="fas fa-sliders"></i>
+            <div class="header-brand">
+                <div class="logo"><i class="fas fa-chart-pie"></i></div>
+                <h1>Portfolio Risk Analyzer</h1>
+            </div>
+            <div class="header-actions">
+                <button class="header-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle Dark Mode">
+                    <i class="fas fa-moon" id="themeIcon"></i>
                 </button>
-                <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle theme">
-                    <i class="fas fa-sun theme-icon" id="themeIcon"></i>
+                <button class="header-btn" onclick="openSettings()" title="Settings">
+                    <i class="fas fa-sliders-h"></i>
                 </button>
             </div>
         </div>
-    </nav>
-
+    </header>
+    
+    <!-- Net Worth Bar -->
     <div class="net-worth-bar">
         <div class="container">
             <div class="net-worth-content">
-                <div class="net-worth-main">
-                    <span class="net-worth-label">Total Net Worth:</span>
-                    <span class="net-worth-value">${{ "{:,.2f}".format(total_net_worth) }}</span>
+                <div class="net-worth-box primary">
+                    <span class="box-label">Total Net Worth</span>
+                    <span class="box-value">${{ "{:,.2f}".format(total_net_worth) }}</span>
                 </div>
-
-                <!-- NEW: Cash vs Investment Breakdown -->
+                <div class="net-worth-spacer"></div>
                 <div class="net-worth-breakdown">
-                    <div class="breakdown-item">
-                        <span class="breakdown-label">Investments</span>
-                        <span class="breakdown-value">${{ "{:,.2f}".format(total_investments|default(total_net_worth))
-                            }}</span>
-                        <span class="breakdown-pct">{{ "{:.1f}".format(investment_percentage|default(100)) }}%</span>
+                    <div class="net-worth-box">
+                        <span class="box-label">Investments</span>
+                        <span class="box-value">${{ "{:,.2f}".format(total_investments|default(total_net_worth)) }}</span>
+                        <span class="box-pct">{{ "{:.1f}".format(investment_percentage|default(100)) }}%</span>
                     </div>
-                    <div class="breakdown-item">
-                        <span class="breakdown-label">Cash</span>
-                        <span class="breakdown-value">${{ "{:,.2f}".format(total_cash|default(0)) }}</span>
-                        <span class="breakdown-pct">{{ "{:.1f}".format(cash_percentage|default(0)) }}%</span>
+                    <div class="net-worth-box cash">
+                        <span class="box-label">Cash</span>
+                        <span class="box-value">${{ "{:,.2f}".format(total_cash|default(0)) }}</span>
+                        <span class="box-pct">{{ "{:.1f}".format(cash_percentage|default(0)) }}%</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <div class="container pb-5">
-        <div class="broker-grid">
-            {% for broker in brokers %}
-            <div class="broker-card" data-broker="{{ broker.name }}">
-                <div class="broker-header">
-                    <div class="broker-info">
-                        <div class="broker-icon-circle {{ broker.name }}">
-                            <i class="fas {% if broker.name == 'merrill' %}fa-building-columns
-                            {% elif broker.name == 'fidelity' %}fa-chart-line
-                            {% elif broker.name == 'webull' %}fa-chart-simple
-                            {% elif broker.name == 'robinhood' %}fa-arrow-trend-up
-                            {% elif broker.name == 'schwab' %}fa-landmark
-                            {% elif broker.name == 'ally' %}fa-handshake
-                            {% elif broker.name == 'etrade' %}fa-coins
-                            {% elif broker.name == 'wellsfargo' %}fa-building
-                            {% endif %}"></i>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            
+            <!-- Resolution Progress -->
+            <div class="resolution-progress" id="resolutionProgress" style="display: none;">
+                <div class="progress-card">
+                    <div class="progress-header">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Resolving Holdings Data</span>
+                    </div>
+                    <div class="progress-stats">
+                        <div class="progress-stat">
+                            <span class="stat-label">Cached</span>
+                            <span class="stat-value" id="cachedCount">0</span>
                         </div>
-                        <div class="broker-name-section">
-                            <h3>{% if broker.name == 'merrill' %}Merrill Lynch
-                                {% elif broker.name == 'schwab' %}Charles Schwab
-                                {% elif broker.name == 'etrade' %}E*TRADE
-                                {% elif broker.name == 'wellsfargo' %}Wells Fargo
-                                {% else %}{{ broker.display_name }}{% endif %}</h3>
-                            {% if broker.has_data and broker.account_last4 %}
-                            <div class="account-info">Account ***{{ broker.account_last4 }}</div>
+                        <div class="progress-stat">
+                            <span class="stat-label">API Calls</span>
+                            <span class="stat-value" id="requestCount">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Broker Cards -->
+            <section class="broker-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-university"></i> Accounts</h2>
+                </div>
+                
+                <div class="broker-grid">
+                    {% for broker in brokers %}
+                    <div class="broker-card" data-broker="{{ broker.name }}">
+                        <div class="broker-header">
+                            <div class="broker-info">
+                                <div class="broker-icon-circle {{ broker.name }}">
+                                    <i class="fas {% if broker.name == 'merrill' %}fa-building-columns{% elif broker.name == 'fidelity' %}fa-chart-line{% elif broker.name == 'webull' %}fa-chart-simple{% elif broker.name == 'robinhood' %}fa-arrow-trend-up{% elif broker.name == 'schwab' %}fa-landmark{% elif broker.name == 'ally' %}fa-handshake{% elif broker.name == 'etrade' %}fa-coins{% elif broker.name == 'wellsfargo' %}fa-building{% endif %}"></i>
+                                </div>
+                                <div class="broker-name-section">
+                                    <h3>{% if broker.name == 'merrill' %}Merrill Lynch{% elif broker.name == 'schwab' %}Charles Schwab{% elif broker.name == 'etrade' %}E*TRADE{% elif broker.name == 'wellsfargo' %}Wells Fargo{% else %}{{ broker.display_name }}{% endif %}</h3>
+                                    {% if broker.has_data and broker.account_last4 %}
+                                    <div class="account-info">Account ***{{ broker.account_last4 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if broker.has_data %}
+                            <div class="broker-value-badge">${{ "{:,.0f}".format(broker.total_value) }}</div>
                             {% endif %}
                         </div>
-                    </div>
-                    {% if broker.has_data %}
-                    <div class="broker-value-badge">${{ "{:,.0f}".format(broker.total_value) }}</div>
-                    {% endif %}
-                </div>
-                
-                {% if broker.has_data %}
-                <div class="broker-tabs">
-                    <button class="broker-tab active" onclick="switchTab('{{ broker.name }}', 'overview')">
-                        <i class="fas fa-chart-line"></i> Overview
-                    </button>
-                    <button class="broker-tab" onclick="switchTab('{{ broker.name }}', 'history')">
-                        <i class="fas fa-history"></i> History
-                    </button>
-                    <button class="broker-tab" onclick="switchTab('{{ broker.name }}', 'upload')">
-                        <i class="fas fa-upload"></i> Upload
-                    </button>
-                </div>
-                
-                <div class="tab-content-area">
-                    <div class="tab-pane active" id="{{ broker.name }}-overview">
-                        <div class="chart-container">
-                            <canvas id="chart-{{ broker.name }}"></canvas>
-                        </div>
-                    </div>
-                    
-                    <div class="tab-pane" id="{{ broker.name }}-history">
-                        <table class="snapshots-table">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Positions</th>
-                                    <th style="text-align: right;">Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td class="snapshot-date">{{ broker.last_updated }}</td>
-                                    <td class="snapshot-positions">{{ broker.total_positions }}</td>
-                                    <td class="snapshot-value">${{ "{:,.2f}".format(broker.total_value) }}</td>
-                                </tr>
-                                <tr style="opacity: 0.5;">
-                                    <td class="snapshot-date">Jan 20, 2026</td>
-                                    <td class="snapshot-positions">{{ broker.total_positions }}</td>
-                                    <td class="snapshot-value">${{ "{:,.2f}".format(broker.total_value * 0.97) }}</td>
-                                </tr>
-                                <tr style="opacity: 0.5;">
-                                    <td class="snapshot-date">Jan 15, 2026</td>
-                                    <td class="snapshot-positions">{{ broker.total_positions }}</td>
-                                    <td class="snapshot-value">${{ "{:,.2f}".format(broker.total_value * 0.95) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <button class="btn-view-all">
-                            <i class="fas fa-list"></i> View All Snapshots
-                        </button>
-                    </div>
-                    
-                    <div class="tab-pane" id="{{ broker.name }}-upload">
-                        <div class="upload-zone" onclick="triggerUpload('{{ broker.name }}')" ondrop="handleDrop(event, '{{ broker.name }}')" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-                            <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                            <p class="mb-2"><strong>Drop CSV here</strong></p>
-                            <p class="text-muted small mb-3">or click to browse</p>
-                            <button class="btn btn-upload">
-                                <i class="fas fa-file-upload"></i> Select CSV File
+                        
+                        {% if broker.has_data %}
+                        <div class="broker-tabs">
+                            <button class="broker-tab active" onclick="switchTab('{{ broker.name }}', 'overview')">
+                                <i class="fas fa-chart-line"></i> Overview
+                            </button>
+                            <button class="broker-tab" onclick="switchTab('{{ broker.name }}', 'history')">
+                                <i class="fas fa-history"></i> History
+                            </button>
+                            <button class="broker-tab" onclick="switchTab('{{ broker.name }}', 'upload')">
+                                <i class="fas fa-upload"></i> Upload
                             </button>
                         </div>
-                        <input type="file" id="file-input-{{ broker.name }}" accept=".csv" style="display: none;" onchange="handleFileSelect(event, '{{ broker.name }}')">
-                    </div>
-                </div>
-                {% else %}
-                <div class="tab-content-area">
-                    <div class="upload-zone" onclick="triggerUpload('{{ broker.name }}')" ondrop="handleDrop(event, '{{ broker.name }}')" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                        <p class="mb-2"><strong>Drop CSV here</strong></p>
-                        <p class="text-muted small mb-3">or click to browse</p>
-                        <button class="btn btn-upload">
-                            <i class="fas fa-file-upload"></i> Upload CSV
-                        </button>
-                    </div>
-                    <input type="file" id="file-input-{{ broker.name }}" accept=".csv" style="display: none;" onchange="handleFileSelect(event, '{{ broker.name }}')">
-                </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- Risk Analysis Section -->
-        <div class="risk-analysis-section mt-5">
-            <div class="risk-header">
-                <h2>
-                    <i class="fas fa-shield-halved"></i>
-                    Risk Analysis
-                </h2>
-                <div class="risk-level-badge" id="overallRiskBadge">
-                    <span class="risk-label">Overall Risk:</span>
-                    <span class="risk-value">Medium</span>
-                </div>
-            </div>
-            
-            <div class="risk-cards-grid">
-                
-                <!-- Stock Concentration Card -->
-                <div class="risk-card">
-                    <div class="risk-card-header">
-                        <h3><i class="fas fa-chart-pie"></i> Stock Concentration</h3>
-                    </div>
-                    <div class="risk-card-body">
-                        <div class="chart-container-risk">
-                            <canvas id="concentrationChart"></canvas>
-                        </div>
-                        <div class="risk-warnings" id="concentrationWarnings">
-                            <div class="warning-item">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <span>No high concentration detected</span>
+                        
+                        <div class="tab-content-area">
+                            <div class="tab-pane active" id="{{ broker.name }}-overview">
+                                <div class="chart-container">
+                                    <canvas id="chart-{{ broker.name }}"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="tab-pane" id="{{ broker.name }}-history">
+                                <div id="{{ broker.name }}-snapshots-container">
+                                    <div class="no-snapshots"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div>
+                                </div>
+                            </div>
+                            
+                            <div class="tab-pane" id="{{ broker.name }}-upload">
+                                <div class="upload-zone" onclick="triggerUpload('{{ broker.name }}')" ondrop="handleDrop(event, '{{ broker.name }}')" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                                    <p class="mb-2"><strong>Drop CSV here</strong></p>
+                                    <p class="text-muted small mb-3">or click to browse</p>
+                                    <button class="btn btn-upload"><i class="fas fa-file-upload"></i> Select CSV</button>
+                                </div>
+                                <input type="file" id="file-input-{{ broker.name }}" accept=".csv" style="display: none;" onchange="handleFileSelect(event, '{{ broker.name }}')">
                             </div>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Sector Allocation Card -->
-                <div class="risk-card">
-                    <div class="risk-card-header">
-                        <h3><i class="fas fa-chart-bar"></i> Sector Allocation</h3>
-                    </div>
-                    <div class="risk-card-body">
-                        <div class="chart-container-risk">
-                            <canvas id="sectorChart"></canvas>
+                        {% else %}
+                        <div class="tab-content-area">
+                            <div class="upload-zone" onclick="triggerUpload('{{ broker.name }}')" ondrop="handleDrop(event, '{{ broker.name }}')" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                                <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                                <p class="mb-2"><strong>Drop CSV here</strong></p>
+                                <p class="text-muted small mb-3">or click to browse</p>
+                                <button class="btn btn-upload"><i class="fas fa-file-upload"></i> Upload CSV</button>
+                            </div>
+                            <input type="file" id="file-input-{{ broker.name }}" accept=".csv" style="display: none;" onchange="handleFileSelect(event, '{{ broker.name }}')">
                         </div>
-                        <div class="sector-legend" id="sectorLegend">
-                            <!-- Populated by JavaScript -->
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Geographic Exposure Card -->
-                <div class="risk-card">
-                    <div class="risk-card-header">
-                        <h3><i class="fas fa-globe"></i> Geographic Exposure</h3>
-                    </div>
-                    <div class="risk-card-body">
-                        <div class="chart-container-risk">
-                            <canvas id="geographyChart"></canvas>
-                        </div>
-                        <div class="chart-legend" id="geographyLegend">
-                            <!-- Populated by JavaScript -->
-                        </div>
-                    </div>
-                </div>
-                
-            </div>
-            
-            <!-- ETF/MF Overlap Warning (if detected) -->
-            <div class="overlap-alert" id="overlapAlert" style="display: none;">
-                <div class="overlap-alert-header">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <strong>ETF/Mutual Fund Overlap Detected</strong>
-                </div>
-                <div class="overlap-alert-body" id="overlapAlertBody">
-                    <!-- Populated by JavaScript -->
-                </div>
-            </div>
-        </div>
-        <!-- END Risk Analysis Section -->     
-
-        <div class="resolution-progress" id="resolutionProgress" style="display: none;">
-            <div class="progress-card">
-                <div class="progress-header">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <span>Resolving Holdings Data</span>
-                    <span class="current-symbol" id="currentSymbol"></span>
-                </div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
-                </div>
-                <div class="progress-body">
-                    <div class="progress-stats">
-                        <div class="stat">
-                            <span class="stat-label">Progress:</span>
-                            <span class="stat-value" id="progressPercent">0%</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-label">Remaining:</span>
-                            <span class="stat-value" id="remainingCount">0</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-label">Cache Hits:</span>
-                            <span class="stat-value" id="cacheHits">0</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-label">API Calls:</span>
-                            <span class="stat-value" id="apiCalls">0</span>
-                        </div>
-                    </div>
-                    <div class="progress-message">
-                        <small id="progressMessage">Initializing...</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-       <!-- Holdings Section -->
-        <div class="holdings-section mt-5">
-            <div class="holdings-header">
-                <h2>
-                    <i class="fas fa-layer-group"></i>
-                    Portfolio Holdings
-                </h2>
-                <div class="holdings-filters">
-                    <select class="filter-select" id="assetTypeFilter" onchange="filterHoldings()">
-                        <option value="all">All Assets</option>
-                        <option value="stock">Stocks Only</option>
-                        <option value="etf">ETFs Only</option>
-                        <option value="mutual_fund">Mutual Funds Only</option>
-                    </select>
-                    <input type="text" class="filter-search" id="searchInput" placeholder="Search symbol..." onkeyup="filterHoldings()">
-                </div>
-            </div>
-
-            <div class="holdings-table-container">
-                {% if holdings and holdings|length > 0 %}
-                <table class="holdings-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 15%;">Symbol</th>
-                            <th style="width: 20%;">Name</th>
-                            <th style="width: 10%;">Quantity</th>
-                            <th style="width: 12%;">Value</th>
-                            <th style="width: 12%;">Sector</th>
-                            <th style="width: 12%;">Country</th>
-                            <th style="width: 14%;">Allocation</th>
-                        </tr>
-                    </thead>
-                    <tbody id="holdingsTableBody">
-                        {% for holding in holdings %}
-                        <!-- Main holding row -->
-                        <tr class="holding-row {% if holding.asset_type == 'cash' %}cash-row{% endif %} {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}expandable{% endif %}" 
-                            data-symbol="{{ holding.symbol }}"
-                            data-asset-type="{{ holding.asset_type }}"
-                            {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}onclick="toggleHoldingRow('{{ holding.symbol }}')"{% endif %}>
-                            
-                            <td>
-                                <div class="symbol-cell">
-                                    {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}
-                                    <i class="fas fa-chevron-right expand-icon" id="icon-{{ holding.symbol }}"></i>
-                                    {% endif %}
-                                    <strong class="symbol-text">{{ holding.symbol }}</strong>
-                                    {% if holding.asset_type == 'cash' %}
-                                    <span class="badge badge-cash">CASH</span>
-                                    {% elif holding.is_etf_or_mf %}
-                                    <span class="badge badge-fund">{{ holding.asset_type|upper }}</span>
-                                    {% endif %}
-                                </div>
-                            </td>
-                            
-                            <td>
-                                <span class="holding-name">{{ holding.name }}</span>
-                            </td>
-                            
-                            <td>
-                                <span class="quantity-value">{{ "{:,.2f}".format(holding.total_quantity|float) }}</span>
-                            </td>
-                            
-                            <td>
-                                <span class="value-amount">${{ "{:,.2f}".format(holding.total_value|float) }}</span>
-                            </td>
-                            
-                            <!-- NEW: Sector column -->
-                            <td>
-                                <span class="sector-badge">{{ holding.sector or 'Unknown' }}</span>
-                            </td>
-                            
-                            <!-- NEW: Country column -->
-                            <td>
-                                <span class="country-badge">{{ holding.country or 'Unknown' }}</span>
-                            </td>
-                            
-                            <td>
-                                <div class="allocation-display">
-                                    <div class="allocation-bar-bg">
-                                        <div class="allocation-bar-fill" style="width: {{ (holding.allocation_pct|float * 100)|round(1) }}%"></div>
-                                    </div>
-                                    <span class="allocation-percent">{{ "{:.1f}".format(holding.allocation_pct|float * 100) }}%</span>
-                                </div>
-                            </td>
-                        </tr>
-                        
-                        <!-- Expandable broker breakdown row -->
-                        {% if holding.brokers|length > 1 or holding.is_etf_or_mf %}
-                        <tr class="broker-breakdown-row" id="breakdown-{{ holding.symbol }}" style="display: none;">
-                            <td colspan="7">  <!-- UPDATED: was 5, now 7 for new columns -->
-                                <div class="breakdown-content">
-                                    
-                                    <!-- Broker breakdown (if multiple brokers) -->
-                                    {% if holding.brokers|length > 1 %}
-                                    <div class="broker-details">
-                                        {% for broker in holding.brokers %}
-                                        <div class="broker-line">
-                                            <i class="fas fa-level-up-alt fa-rotate-90"></i>
-                                            <span class="broker-name">{{ broker.broker_display }}:</span>
-                                            <span class="broker-qty">{{ "{:,.2f}".format(broker.quantity|float) }} shares</span>
-                                            <span class="broker-value">({{ "$%.2f"|format(broker.value|float) }})</span>
-                                        </div>
-                                        {% endfor %}
-                                    </div>
-                                    {% endif %}
-                                    
-                                    <!-- ETF/MF underlying holdings -->
-                                    {% if holding.is_etf_or_mf %}
-                                    <div class="underlying-section">
-                                        <div class="underlying-header">
-                                            <i class="fas fa-layer-group"></i>
-                                            <span>Underlying Holdings ({{ holding.underlying_count or 0 }})</span>
-                                            {% if holding.underlying_count > 0 %}
-                                            <button class="btn-expand-underlying" onclick="event.stopPropagation(); viewUnderlying('{{ holding.symbol }}')">
-                                                View All <i class="fas fa-arrow-right"></i>
-                                            </button>
-                                            {% endif %}
-                                        </div>
-                                        {% if holding.underlying_count == 0 %}
-                                        <div class="underlying-status">
-                                            <em>Underlying holdings not yet resolved</em>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    {% endif %}
-                                    
-                                </div>
-                            </td>
-                        </tr>
                         {% endif %}
-                        {% endfor %}
-                    </tbody>
-                </table>                
-                {% else %}
-                <div class="no-holdings">
-                    <i class="fas fa-inbox"></i>
-                    <p>No holdings found</p>
-                    <small>Upload a CSV file from your brokers to get started</small>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        <!-- End Holdings Section -->
-
-    </div>
-
-    <div class="toast-container" id="toastContainer"></div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <script>
-        function toggleTheme() {
-            const html = document.documentElement;
-            const currentTheme = html.getAttribute('data-theme');
-            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            const icon = document.getElementById('themeIcon');
-            icon.className = newTheme === 'dark' ? 'fas fa-moon theme-icon' : 'fas fa-sun theme-icon';
-            recreateCharts();
-        }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            const icon = document.getElementById('themeIcon');
-            if (savedTheme === 'dark') icon.className = 'fas fa-moon theme-icon';
-            
-            // Wait for Chart.js to load
-            if (typeof Chart !== 'undefined') {
-                initializeCharts();
-            } else {
-                window.addEventListener('load', initializeCharts);
-            }
-        });
-        
-        function switchTab(broker, tabName) {
-            const card = document.querySelector(`.broker-icon-circle.${broker}`).closest('.broker-card');
-            if (!card) return;
-            card.querySelectorAll('.broker-tab').forEach(tab => tab.classList.remove('active'));
-            event.target.closest('.broker-tab').classList.add('active');
-            card.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-            card.querySelector(`#${broker}-${tabName}`).classList.add('active');
-        }
-        
-        function triggerUpload(n) { document.getElementById(`file-input-${n}`).click(); }
-        function handleFileSelect(e, n) { if (e.target.files[0]) uploadFile(e.target.files[0], n); }
-        function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('dragover'); }
-        function handleDragLeave(e) { e.currentTarget.classList.remove('dragover'); }
-        function handleDrop(e, n) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('dragover');
-            const f = e.dataTransfer.files[0];
-            if (f && f.name.endsWith('.csv')) uploadFile(f, n);
-            else showToast('Invalid File', 'Please drop a CSV file', 'error');
-        }
-
-        async function uploadFile(file, broker) {
-            const fd = new FormData();
-            fd.append('file', file);
-            fd.append('broker', broker);
-            showToast('Uploading...', `Processing ${file.name}`, 'success');
-            try {
-                const res = await fetch('/upload', { method: 'POST', body: fd });
-                const data = await res.json();
-                if (data.success) {
-                    showToast('Upload Successful', `Uploaded ${data.data.total_positions} positions!`, 'success');
-                    setTimeout(() => location.reload(), 1500);
-                } else showToast('Upload Failed', data.message || 'An error occurred', 'error');
-            } catch (err) {
-                showToast('Network Error', `Could not connect: ${err.message}`, 'error');
-            }
-        }
-
-        function showToast(title, msg, type = 'success', dur = 6000) {
-            const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle' };
-            const id = `toast-${Date.now()}`;
-            const html = `<div class="custom-toast toast-${type}" id="${id}">
-                <div class="toast-header-custom">
-                    <div class="toast-icon"><i class="fas ${icons[type]}"></i></div>
-                    <div class="toast-content">
-                        <p class="toast-title">${title}</p>
-                        <p class="toast-message">${msg}</p>
                     </div>
-                    <button class="toast-close" onclick="closeToast('${id}')">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    {% endfor %}
                 </div>
-            </div>`;
-            document.getElementById('toastContainer').insertAdjacentHTML('beforeend', html);
-            setTimeout(() => closeToast(id), dur);
-        }
-
-        function closeToast(id) {
-            const t = document.getElementById(id);
-            if (t) { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }
-        }
-        
-        let charts = {};
-        
-        function initializeCharts() {
-            {% for broker in brokers %}{% if broker.has_data %}
-            createChart('{{ broker.name }}', {{ broker.total_value }});
-            {% endif %}{% endfor %}
-        }
-        
-        function createChart(broker, val) {
-            const ctx = document.getElementById(`chart-${broker}`);
-            if (!ctx) return;
-            const theme = document.documentElement.getAttribute('data-theme');
-            const gridColor = theme === 'dark' ? '#4a5568' : '#e2e8f0';
-            const textColor = theme === 'dark' ? '#cbd5e0' : '#718096';
-            if (charts[broker]) charts[broker].destroy();
+            </section>
             
-            const today = new Date();
-            const labels = [], data = [];
-            for (let i = 30; i >= 0; i -= 5) {
-                const d = new Date(today);
-                d.setDate(d.getDate() - i);
-                labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-                const variance = 1 + (Math.random() - 0.5) * 0.1;
-                data.push(val * variance * (0.9 + (30 - i) / 300));
-            }
-            
-            charts[broker] = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Portfolio Value',
-                        data: data,
-                        borderColor: '#667eea',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: ctx => '$' + ctx.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            grid: { color: gridColor },
-                            ticks: {
-                                color: textColor,
-                                callback: v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-                            }
-                        },
-                        x: {
-                            grid: { color: gridColor },
-                            ticks: { color: textColor }
-                        }
-                    }
-                }
-            });
-        }
-        
-        function recreateCharts() {
-            {% for broker in brokers %}{% if broker.has_data %}
-            createChart('{{ broker.name }}', {{ broker.total_value }});
-            {% endif %}{% endfor %}
-        }
-
-        function toggleHoldingRow(symbol) {
-            const breakdownRow = document.getElementById(`breakdown-${symbol}`);
-            const icon = document.getElementById(`icon-${symbol}`);
-            
-            if (breakdownRow.style.display === 'none') {
-                breakdownRow.style.display = 'table-row';
-                if (icon) icon.classList.add('rotated');
-            } else {
-                breakdownRow.style.display = 'none';
-                if (icon) icon.classList.remove('rotated');
-            }
-        }
-
-        function filterHoldings() {
-            const assetType = document.getElementById('assetTypeFilter').value;
-            const searchText = document.getElementById('searchInput').value.toLowerCase();
-            const rows = document.querySelectorAll('.holding-row');
-            
-            rows.forEach(row => {
-                const symbol = row.dataset.symbol.toLowerCase();
-                const type = row.dataset.assetType;
-                
-                const matchesType = assetType === 'all' || type === assetType;
-                const matchesSearch = symbol.includes(searchText);
-                
-                if (matchesType && matchesSearch) {
-                    row.style.display = '';
-                    // Keep breakdown hidden unless manually expanded
-                    const breakdown = document.getElementById(`breakdown-${row.dataset.symbol}`);
-                    if (breakdown && !document.getElementById(`icon-${row.dataset.symbol}`)?.classList.contains('rotated')) {
-                        breakdown.style.display = 'none';
-                    }
-                } else {
-                    row.style.display = 'none';
-                    const breakdown = document.getElementById(`breakdown-${row.dataset.symbol}`);
-                    if (breakdown) breakdown.style.display = 'none';
-                }
-            });
-        }
-
-        function viewUnderlying(symbol) {
-            // TODO: Open modal showing all underlying holdings
-            //alert(`View detailed underlying holdings for ${symbol} - Modal to be implemented`);
-        }
-
-    </script>
-    <script>
-    // Store underlying holdings data
-    let currentUnderlyingData = [];
-    let directHoldingsSet = new Set(); // Symbols held directly in portfolio
-
-    async function viewUnderlying(symbol) {
-        try {
-            const response = await fetch(`/api/holdings/underlying/${symbol}`);
-            
-            if (!response.ok) {
-                throw new Error('Failed to fetch underlying holdings');
-            }
-            
-            const data = await response.json();
-            
-            // Update modal header
-            document.getElementById('modalFundSymbol').textContent = data.symbol;
-            document.getElementById('modalFundName').textContent = data.name;
-            document.getElementById('modalTotalValue').textContent = `$${formatNumber(data.total_value)}`;
-            document.getElementById('modalQuantity').textContent = `${formatNumber(data.quantity)} shares @ $${formatNumber(data.price)}`;
-            document.getElementById('modalUnderlyingCount').textContent = `${data.underlying_holdings.length} stocks`;
-            
-            // Store data globally
-            currentUnderlyingData = data.underlying_holdings;
-            directHoldingsSet = new Set(data.direct_holdings || []);
-            
-            // Populate table
-            renderUnderlyingTable(currentUnderlyingData);
-            
-            // Show modal using class
-            document.getElementById('underlyingModal').classList.add('show');
-            
-            // Reset filters
-            document.getElementById('underlyingSearch').value = '';
-            document.getElementById('overlapOnlyCheckbox').checked = false;
-            
-        } catch (error) {
-            console.error('Error loading underlying holdings:', error);
-            showToast('Error', 'Failed to load underlying holdings. Please try again.', 'error');
-        }
-    }
-
-    function closeUnderlyingModal(event) {
-        if (event && event.target !== event.currentTarget) {
-            return;
-        }
-        document.getElementById('underlyingModal').classList.remove('show');
-    }
-
-    function renderUnderlyingTable(holdings) {
-        const tbody = document.getElementById('underlyingTableBody');
-        const emptyDiv = document.getElementById('underlyingEmpty');
-        
-        if (holdings.length === 0) {
-            tbody.innerHTML = '';
-            emptyDiv.style.display = 'block';
-            return;
-        }
-        
-        emptyDiv.style.display = 'none';
-        
-        tbody.innerHTML = holdings.map(holding => {
-            const hasOverlap = directHoldingsSet.has(holding.symbol);
-            const rowClass = hasOverlap ? 'has-overlap' : '';
-            const sector = holding.sector || 'Unknown';
-            const country = holding.country || 'Unknown';
-            
-            return `
-                <tr class="${rowClass}" data-symbol="${holding.symbol}" data-name="${holding.name.toLowerCase()}">
-                    <td>
-                        <span class="underlying-symbol">${holding.symbol}</span>
-                    </td>
-                    <td>
-                        <span class="underlying-name">${holding.name}</span>
-                    </td>
-                    <td>
-                        <span class="weight-value">${formatPercent(holding.weight)}</span>
-                    </td>
-                    <td>
-                        $${formatNumber(holding.value)}
-                    </td>
-                    <td><span class="sector-badge">${sector}</span></td>
-                    <td><span class="country-badge">${country}</span></td>
-                    <td>
-                        ${hasOverlap ? '<span class="overlap-badge"><i class="fas fa-exclamation-triangle"></i> Also held</span>' : ''}
-                    </td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    function filterUnderlyingHoldings() {
-        const searchText = document.getElementById('underlyingSearch').value.toLowerCase();
-        const overlapOnly = document.getElementById('overlapOnlyCheckbox').checked;
-        
-        let filtered = currentUnderlyingData;
-        
-        // Filter by search text
-        if (searchText) {
-            filtered = filtered.filter(h => 
-                h.symbol.toLowerCase().includes(searchText) || 
-                h.name.toLowerCase().includes(searchText)
-            );
-        }
-        
-        // Filter by overlap
-        if (overlapOnly) {
-            filtered = filtered.filter(h => directHoldingsSet.has(h.symbol));
-        }
-        
-        renderUnderlyingTable(filtered);
-    }
-
-    function formatNumber(num) {
-        return Number(num).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    }
-
-    function formatPercent(num) {
-        return (Number(num) * 100).toFixed(2) + '%';
-    }
-
-    // Close modal on Escape key
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && document.getElementById('underlyingModal').style.display === 'flex') {
-            closeUnderlyingModal();
-        }
-    });
-    </script>
-    <!-- Script block for risk -->
-    <script>
-    // Risk Analysis Charts
-    let concentrationChart = null;
-    let sectorChart = null;
-    let geographyChart = null;
-
-    function initializeRiskCharts() {
-        // Get risk metrics from backend (passed via Jinja)
-        const riskMetrics = {{ risk_metrics|tojson|safe }};
-        
-        if (!riskMetrics) {
-            console.error('No risk metrics available');
-            return;
-        }
-        
-        // Initialize charts with real data
-        createConcentrationChart(riskMetrics.concentration);
-        createSectorChart(riskMetrics.sectors);
-        createGeographyChart(riskMetrics.geography);
-        updateOverallRisk(riskMetrics.overall_risk, riskMetrics.concentration);
-    }
-
-    function createConcentrationChart(concentration) {
-        const ctx = document.getElementById('concentrationChart');
-        const warningsDiv = document.getElementById('concentrationWarnings');
-        
-        if (!ctx) return;
-        
-        // Get concentration threshold from settings (default 20)
-        const threshold = parseInt(localStorage.getItem('risk_concentration') || '20');
-        
-        // Check if we have any data at all
-        // Note: Backend now ONLY returns stocks exceeding threshold
-        if (!concentration || concentration.length === 0) {
-            // NO STOCKS EXCEED THRESHOLD
-            ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">No stocks exceed concentration threshold</p>';
-            
-            if (warningsDiv) {
-                warningsDiv.innerHTML = '<div class="warning-item no-warning"><i class="fas fa-check-circle"></i><span>No high concentration detected</span></div>';
-            }
-            return;
-        }
-        
-        const labels = concentration.map(h => h.symbol);
-        const data = concentration.map(h => h.allocation_pct.toFixed(1));
-        
-        // Use distinct colors for each slice
-        const baseColors = [
-            '#667eea',  // Blue
-            '#764ba2',  // Purple
-            '#f093fb',  // Pink
-            '#4facfe',  // Light blue
-            '#43e97b'   // Green
-        ];
-        
-        // All stocks in concentration already exceed threshold (backend filtered)
-        // So all should be red
-        const backgroundColors = concentration.map((h, idx) => '#ef4444'); // All red
-        
-        if (concentrationChart) {
-            concentrationChart.destroy();
-        }
-        
-        concentrationChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    backgroundColor: backgroundColors,
-                    borderColor: '#ffffff',  // White borders between slices
-                    borderWidth: 3           // 3px borders
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => `${context.label}: ${context.parsed}%`
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Show all stocks as warnings (all exceed threshold)
-        warningsDiv.innerHTML = concentration.map(h => `
-            <div class="warning-item">
-                <i class="fas fa-exclamation-triangle"></i>
-                <span>${h.symbol}: ${h.allocation_pct.toFixed(1)}% (over ${threshold}% limit)</span>
-            </div>
-        `).join('');
-    }
-
-    function createSectorChart(sectors) {
-        const ctx = document.getElementById('sectorChart');
-        const legendDiv = document.getElementById('sectorLegend');
-        
-        if (!ctx) return;
-        
-        // Check if we have meaningful data
-        if (!sectors || Object.keys(sectors).length === 0) {
-            ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Sector data not available yet</p>';
-            if (legendDiv) legendDiv.innerHTML = '';
-            return;
-        }
-        
-        if (Object.keys(sectors).length === 1 && sectors['Unknown']) {
-            ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Sector data not available yet</p>';
-            if (legendDiv) legendDiv.innerHTML = '';
-            return;
-        }
-        
-        // Sectors are already sorted by backend, but ensure order is maintained
-        // Convert to arrays preserving order
-        const sortedEntries = Object.entries(sectors).sort((a, b) => b[1] - a[1]);
-        const labels = sortedEntries.map(([k, v]) => k);
-        const data = sortedEntries.map(([k, v]) => v);
-        
-        // Get threshold from localStorage
-        const threshold = parseInt(localStorage.getItem('risk_sector') || '40');
-        
-        // Color sectors exceeding threshold in red
-        const backgroundColors = labels.map((label, idx) => {
-            if (label === 'Unknown') return '#cbd5e0';
-            return data[idx] > threshold ? '#ef4444' : '#667eea';
-        });
-        
-        if (sectorChart) {
-            sectorChart.destroy();
-        }
-        
-        sectorChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    backgroundColor: backgroundColors,
-                    borderColor: '#ffffff',
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => context.parsed.x + '%'
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        max: 100,
-                        ticks: {
-                            callback: (value) => value + '%'
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Add legend (also sorted)
-        if (legendDiv) {
-            legendDiv.innerHTML = sortedEntries.map(([label, value], idx) =>
-                '<div class="chart-legend-item">' +
-                    '<div class="legend-color" style="background: ' + backgroundColors[idx] + ';"></div>' +
-                    '<span class="legend-label">' + label + '</span>' +
-                    '<span class="legend-value">' + value + '%</span>' +
-                '</div>'
-            ).join('');
-        }
-    }
-
-    function createGeographyChart(geography) {
-        const ctx = document.getElementById('geographyChart');
-        const legendDiv = document.getElementById('geographyLegend');
-        
-        if (!ctx) return;
-        
-        if (!geography || Object.keys(geography).length === 0) {
-            ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Geography data not available yet</p>';
-            if (legendDiv) legendDiv.innerHTML = '';
-            return;
-        }
-        
-        // Check if only Unknown
-        if (Object.keys(geography).length === 1 && geography['Unknown']) {
-            ctx.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Geography data not available yet</p>';
-            if (legendDiv) legendDiv.innerHTML = '';
-            return;
-        }
-        
-        const labels = Object.keys(geography);
-        const data = Object.values(geography);
-        
-        // Color mapping - includes Cash now
-        const colorMap = {
-            'US': '#667eea',
-            'International Developed': '#764ba2',
-            'Emerging Markets': '#f093fb',
-            'Cash': '#10b981',  // Green for cash
-            'Unknown': '#cbd5e0',
-            'Other': '#a0aec0'
-        };
-        
-        const backgroundColors = labels.map(label => colorMap[label] || '#a0aec0');
-        
-        if (geographyChart) {
-            geographyChart.destroy();
-        }
-        
-        geographyChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    backgroundColor: backgroundColors,
-                    borderColor: '#ffffff',
-                    borderWidth: 3
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => context.label + ': ' + context.parsed + '%'
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Add legend below chart
-        if (legendDiv) {
-            legendDiv.innerHTML = labels.map((label, idx) => 
-                '<div class="chart-legend-item">' +
-                    '<div class="legend-color" style="background: ' + backgroundColors[idx] + ';"></div>' +
-                    '<span class="legend-label">' + label + '</span>' +
-                    '<span class="legend-value">' + data[idx] + '%</span>' +
-                '</div>'
-            ).join('');
-        }
-    }
-        
-    function updateOverallRisk(riskLevel, concentration) {
-        const badge = document.getElementById('overallRiskBadge');
-        if (!badge) return;
-        
-        const valueSpan = badge.querySelector('.risk-value');
-        
-        // Capitalize first letter
-        const displayRisk = riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1);
-        
-        valueSpan.textContent = displayRisk;
-        valueSpan.className = `risk-value ${riskLevel}`;
-    }
-
-    // Initialize charts when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof Chart !== 'undefined') {
-            setTimeout(initializeRiskCharts, 100);
-        }
-    });
-    </script>     
-    <!-- End Script block for risk -->
-
-    <!-- Script block for Risk Settings -->
-    <script>
-    function openRiskSettings() {
-        // Load saved settings from localStorage
-        const concentration = localStorage.getItem('risk_concentration') || 20;
-        const overlap = localStorage.getItem('risk_overlap') || 70;
-        const sector = localStorage.getItem('risk_sector') || 40;
-        
-        document.getElementById('concentrationThreshold').value = concentration;
-        document.getElementById('overlapThreshold').value = overlap;
-        document.getElementById('sectorThreshold').value = sector;
-        
-        updateConcentrationDisplay(concentration);
-        updateOverlapDisplay(overlap);
-        updateSectorDisplay(sector);
-        
-        // Load broker visibility settings
-        const allBrokerCards = document.querySelectorAll('.broker-card');
-        allBrokerCards.forEach(card => {
-            const brokerName = card.dataset.broker;
-            const checkbox = document.getElementById(`toggle_${brokerName}`);
-            
-            if (checkbox) {
-                // Load saved visibility (default to true/visible)
-                const isVisible = localStorage.getItem(`broker_visible_${brokerName}`) !== 'false';
-                checkbox.checked = isVisible;
-            }
-        });
-        
-        document.getElementById('riskSettingsModal').style.display = 'flex';
-    }
-
-    function closeRiskSettings(event) {
-        if (event && event.target !== event.currentTarget) return;
-        document.getElementById('riskSettingsModal').style.display = 'none';
-    }
-
-    function updateConcentrationDisplay(value) {
-        document.getElementById('concentrationDisplay').textContent = value + '%';
-    }
-
-    function updateOverlapDisplay(value) {
-        document.getElementById('overlapDisplay').textContent = value + '%';
-    }
-
-    function updateSectorDisplay(value) {
-        document.getElementById('sectorDisplay').textContent = value + '%';
-    }
-
-    function resetRiskDefaults() {
-        document.getElementById('concentrationThreshold').value = 20;
-        document.getElementById('overlapThreshold').value = 70;
-        document.getElementById('sectorThreshold').value = 40;
-        
-        updateConcentrationDisplay(20);
-        updateOverlapDisplay(70);
-        updateSectorDisplay(40);
-        
-        // Reset all broker visibility to true
-        const checkboxes = document.querySelectorAll('.broker-visibility-toggle');
-        checkboxes.forEach(cb => {
-            if (!cb.disabled) {
-                cb.checked = true;
-            }
-        });
-    }
-
-    function saveRiskSettings() {
-        try {
-            // Save threshold settings
-            const concentration = document.getElementById('concentrationThreshold').value;
-            const overlap = document.getElementById('overlapThreshold').value;
-            const sector = document.getElementById('sectorThreshold').value;
-            
-            localStorage.setItem('risk_concentration', concentration);
-            localStorage.setItem('risk_overlap', overlap);
-            localStorage.setItem('risk_sector', sector);
-            
-            // Save broker visibility settings
-            const checkboxes = document.querySelectorAll('.broker-visibility-toggle');
-            checkboxes.forEach(checkbox => {
-                const brokerName = checkbox.dataset.broker;
-                localStorage.setItem(`broker_visible_${brokerName}`, checkbox.checked);
-            });
-            
-            // NO ALERT - just close modal
-            closeRiskSettings();
-            
-            // Reload page to apply changes
-            location.reload();
-            
-        } catch (error) {
-            // ONLY show alert on error
-            alert('Error saving settings: ' + error.message);
-        }
-    }
-
-    // Apply broker visibility on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        const allBrokerCards = document.querySelectorAll('.broker-card');
-        allBrokerCards.forEach(card => {
-            const brokerName = card.dataset.broker;
-            const isVisible = localStorage.getItem(`broker_visible_${brokerName}`) !== 'false';
-            
-            if (!isVisible) {
-                card.style.display = 'none';
-            }
-        });
-    });
-
-    // Close on Escape key
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && document.getElementById('riskSettingsModal').style.display === 'flex') {
-            closeRiskSettings();
-        }
-    });
-
-    </script>
-    
-    <!-- End Script block for Risk Settings -->
-     <!-- Script Block for Progress Indicator -->
-    <script>      
-    // Track if we should check progress (only after upload)
-    let checkingProgress = false;
-    let progressInterval = null;
-
-    // Check resolution progress
-    function checkResolutionProgress() {
-        fetch('/api/resolution/progress')
-            .then(response => response.json())
-            .then(data => {
-                const progressDiv = document.getElementById('resolutionProgress');
-                
-                if (data.is_resolving) {
-                    checkingProgress = true;
-                    progressDiv.style.display = 'block';
-                    
-                    // Update progress bar and percentage
-                    const progressPct = data.progress_percentage || 0;
-                    document.getElementById('progressPercent').textContent = `${progressPct}%`;
-                    document.getElementById('progressBarFill').style.width = `${progressPct}%`;
-                    
-                    // Update remaining count - this now shows actual remaining
-                    const remaining = data.total_remaining || data.unresolved_count || 0;
-                    document.getElementById('remainingCount').textContent = remaining;
-                    
-                    // Update cache hits and API calls
-                    document.getElementById('cacheHits').textContent = data.cached_hits || 0;
-                    document.getElementById('apiCalls').textContent = data.api_calls || 0;
-                    
-                    // Update current symbol being processed
-                    if (data.current_symbol) {
-                        document.getElementById('currentSymbol').textContent = data.current_symbol;
-                    } else {
-                        document.getElementById('currentSymbol').textContent = '';
-                    }
-                    
-                    // Update message based on current step
-                    const messageEl = document.getElementById('progressMessage');
-                    if (data.current_step === 'etf_resolution') {
-                        messageEl.textContent = 'Resolving ETF/Mutual Fund underlying holdings...';
-                    } else if (data.current_step === 'parent_info') {
-                        messageEl.textContent = `Fetching sector data for holdings (${data.parent_symbols_processed || 0}/${data.parent_symbols_total || 0})...`;
-                    } else if (data.current_step === 'underlying_info') {
-                        messageEl.textContent = `Enriching underlying holdings (${data.underlying_symbols_processed || 0}/${data.underlying_symbols_total || 0})...`;
-                    } else {
-                        messageEl.textContent = 'Processing holdings data...';
-                    }
-                    
-                } else {
-                    progressDiv.style.display = 'none';
-                    if (checkingProgress) {
-                        checkingProgress = false;
-                        if (progressInterval) {
-                            clearInterval(progressInterval);
-                            progressInterval = null;
-                        }
-                        // Refresh page to show updated data
-                        location.reload();
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error checking progress:', error);
-            });
-    }
-
-    // Start checking progress (called after CSV upload)
-    function startProgressChecking() {
-        checkingProgress = true;
-        checkResolutionProgress(); // Check immediately
-        
-        // Check every 5 seconds
-        if (!progressInterval) {
-            progressInterval = setInterval(checkResolutionProgress, 5000);
-        }
-    }
-
-    // Stop checking progress
-    function stopProgressChecking() {
-        checkingProgress = false;
-        if (progressInterval) {
-            clearInterval(progressInterval);
-            progressInterval = null;
-        }
-    }
-
-    // Modify the upload form submission to trigger progress checking
-    document.addEventListener('DOMContentLoaded', function() {
-        // Find all upload forms and add progress checking on submit
-        const uploadForms = document.querySelectorAll('form[action="/upload"]');
-        uploadForms.forEach(form => {
-            form.addEventListener('submit', function(e) {
-                // Start checking progress after form submission
-                setTimeout(startProgressChecking, 2000);
-            });
-        });
-        
-        // Check once on page load to see if resolution is ongoing
-        checkResolutionProgress();
-    });
-
-    </script>      
-     <!-- End script block for progress -->
-
-    <!-- Underlying Holdings Modal -->
-    <div class="modal-overlay" id="underlyingModal" onclick="closeUnderlyingModal(event)">
-        <div class="modal-container" onclick="event.stopPropagation()">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fas fa-layer-group"></i>
-                    <span id="modalFundSymbol">VTI</span>
-                    <span class="modal-subtitle" id="modalFundName">Vanguard Total Stock Market ETF</span>
+            <!-- Holdings Section -->
+            <section class="holdings-section">
+                <div class="holdings-header">
+                    <h2><i class="fas fa-wallet"></i> Holdings</h2>
+                    <div class="holdings-search">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="holdingsSearch" placeholder="Search holdings..." onkeyup="filterHoldings()">
+                    </div>
                 </div>
-                <button class="modal-close" onclick="closeUnderlyingModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="modal-summary">
-                <div class="summary-item">
-                    <span class="summary-label">Total Value:</span>
-                    <span class="summary-value" id="modalTotalValue">$24,500.00</span>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">Quantity:</span>
-                    <span class="summary-value" id="modalQuantity">100 shares @ $245.00</span>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">Underlying Holdings:</span>
-                    <span class="summary-value" id="modalUnderlyingCount">500 stocks</span>
-                </div>
-            </div>
-            
-            <div class="modal-filters">
-                <input type="text" class="modal-search" id="underlyingSearch" placeholder="Search underlying symbol or name..." onkeyup="filterUnderlyingHoldings()">
-                <div class="modal-filter-right">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="overlapOnlyCheckbox" onchange="filterUnderlyingHoldings()">
-                        <span>Show overlaps only</span>
-                    </label>
-                </div>
-            </div>
-            
-            <div class="modal-body">
-                <div class="underlying-table-wrapper">
-                    <table class="underlying-table">
+                <div class="table-container">
+                    <table class="holdings-table">
                         <thead>
                             <tr>
-                                <th style="width: 15%;">Symbol</th>
-                                <th style="width: 35%;">Name</th>
-                                <th style="width: 15%;">Weight</th>
-                                <th style="width: 20%;">Est. Value</th>
-                                <th style="width: 15%;">Sector</th>
-                                <th style="width: 13%;">Country</th>
-                                <th style="width: 15%;">Overlap</th>
+                                <th>Symbol</th>
+                                <th>Value</th>
+                                <th>Sector</th>
+                                <th>Country</th>
+                                <th>Allocation</th>
                             </tr>
                         </thead>
-                        <tbody id="underlyingTableBody">
-                            <!-- Populated by JavaScript -->
+                        <tbody id="holdingsTableBody">
+                            {% for holding in holdings %}
+                            <tr class="holding-row {% if holding.asset_type == 'cash' %}cash-row{% endif %}" data-symbol="{{ holding.symbol }}" {% if holding.is_etf_or_mf %}onclick="viewUnderlying('{{ holding.symbol }}')" style="cursor:pointer;"{% endif %}>
+                                <td>
+                                    <div class="holding-symbol">
+                                        <span class="symbol">
+                                            {{ holding.symbol }}
+                                            {% if holding.asset_type == 'cash' %}<span class="badge badge-cash">CASH</span>
+                                            {% elif holding.is_etf_or_mf %}<span class="badge badge-fund">{{ holding.asset_type|upper }}</span>{% endif %}
+                                        </span>
+                                        <span class="name">{{ holding.name|default('') }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="holding-value">${{ "{:,.2f}".format(holding.total_value|default(0)|float) }}</div>
+                                    <div class="holding-price">{{ "{:,.4f}".format(holding.total_quantity|default(holding.quantity)|default(0)|float) }} @ ${{ "{:,.2f}".format(holding.price|default(0)|float) }}</div>
+                                </td>
+                                <td class="holding-sector {% if holding.sector == 'Unknown' or not holding.sector %}unknown{% endif %}">{{ holding.sector|default('Unknown') }}</td>
+                                <td class="holding-country {% if holding.country == 'Unknown' or not holding.country %}unknown{% endif %}">{{ holding.country|default('Unknown') }}</td>
+                                <td class="holding-allocation">
+                                    <div class="allocation-value">{{ "{:.1f}".format(holding.allocation_pct|default(0)|float) }}%</div>
+                                    <div class="allocation-bar">
+                                        <div class="allocation-bar-fill {% if holding.asset_type == 'cash' %}cash{% endif %}" style="width: {{ holding.allocation_pct|default(0)|float }}%"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="empty-state">No holdings data. Upload a CSV to see your portfolio.</td></tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
-                
-                <div id="underlyingEmpty" class="underlying-empty" style="display: none;">
-                    <i class="fas fa-search"></i>
-                    <p>No underlying holdings found</p>
-                </div>
-            </div>
+            </section>
             
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeUnderlyingModal()">Close</button>
-            </div>
+            <!-- Risk Analysis Section -->
+            <section class="risk-section">
+                <div class="risk-header">
+                    <h2><i class="fas fa-shield-alt"></i> Risk Analysis</h2>
+                    <div class="overall-risk">
+                        <span class="label">Overall Risk:</span>
+                        <span class="value {{ risk_metrics.overall_risk|default('low') }}">{{ risk_metrics.overall_risk|default('Low')|title }}</span>
+                    </div>
+                </div>
+                
+                <div class="risk-grid">
+                    <div class="risk-card">
+                        <div class="risk-card-header"><i class="fas fa-chart-pie"></i><span>Stock Concentration</span></div>
+                        <div class="risk-card-body"><div class="concentration-chart-container"></div></div>
+                    </div>
+                    
+                    <div class="risk-card">
+                        <div class="risk-card-header"><i class="fas fa-industry"></i><span>Sector Allocation</span></div>
+                        <div class="risk-card-body">
+                            <div class="chart-container"><canvas id="sectorChart"></canvas></div>
+                            <div class="chart-legend" id="sectorLegend"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="risk-card">
+                        <div class="risk-card-header"><i class="fas fa-globe"></i><span>Geographic Exposure</span></div>
+                        <div class="risk-card-body">
+                            <div class="chart-container"><canvas id="geographyChart"></canvas></div>
+                            <div class="chart-legend" id="geographyLegend"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
-    </div>
-
-    <div class="modal-overlay" id="riskSettingsModal" style="display: none;" onclick="closeRiskSettings(event)">
-        <div class="modal-container settings-modal" onclick="event.stopPropagation()">
+    </main>
+    
+    <!-- Underlying Holdings Modal -->
+    <div class="modal-overlay" id="underlyingModal">
+        <div class="modal-container">
             <div class="modal-header">
                 <div class="modal-title">
-                    <i class="fas fa-sliders"></i>
-                    <span>Risk Analysis Settings</span>
+                    <div class="modal-title-icon"><i class="fas fa-layer-group"></i></div>
+                    <div class="modal-title-text">
+                        <h3 id="modalFundSymbol">FUND</h3>
+                        <p id="modalFundName">Fund Name</p>
+                    </div>
                 </div>
-                <button class="modal-close" onclick="closeRiskSettings()">
-                    <i class="fas fa-times"></i>
-                </button>
+                <button class="modal-close" onclick="closeUnderlyingModal()"><i class="fas fa-times"></i></button>
             </div>
-            
+            <div class="modal-stats">
+                <div class="modal-stat"><span class="modal-stat-label">Total Value</span><span class="modal-stat-value" id="modalTotalValue">$0.00</span></div>
+                <div class="modal-stat"><span class="modal-stat-label">Quantity</span><span class="modal-stat-value" id="modalQuantity">0 shares</span></div>
+                <div class="modal-stat"><span class="modal-stat-label">Holdings</span><span class="modal-stat-value" id="modalUnderlyingCount">0 stocks</span></div>
+            </div>
+            <div class="modal-toolbar">
+                <div class="modal-search"><i class="fas fa-search"></i><input type="text" id="underlyingSearch" placeholder="Search..."></div>
+                <div class="modal-filter"><label><input type="checkbox" id="overlapOnlyCheckbox"><span>Show overlaps only</span></label></div>
+            </div>
             <div class="modal-body">
-                <!-- Stock Concentration Setting -->
-                <div class="settings-section">
-                    <h4>Stock Concentration Threshold</h4>
-                    <p class="settings-description">Individual stocks exceeding this percentage will be flagged as high risk</p>
-                    
-                    <div class="setting-item">
-                        <label for="concentrationThreshold">
-                            <span class="setting-label">Warning Threshold</span>
-                            <span class="setting-current" id="concentrationDisplay">20%</span>
-                        </label>
-                        <div class="slider-container">
-                            <input type="range" id="concentrationThreshold" min="5" max="50" value="20" step="1" 
-                                oninput="updateConcentrationDisplay(this.value)">
-                            <div class="slider-labels">
-                                <span>5%</span>
-                                <span>50%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- ETF Overlap Setting -->
-                <div class="settings-section">
-                    <h4>ETF/Mutual Fund Overlap</h4>
-                    <p class="settings-description">Funds with overlap above this threshold will be flagged as redundant</p>
-                    
-                    <div class="setting-item">
-                        <label for="overlapThreshold">
-                            <span class="setting-label">Overlap Warning</span>
-                            <span class="setting-current" id="overlapDisplay">70%</span>
-                        </label>
-                        <div class="slider-container">
-                            <input type="range" id="overlapThreshold" min="30" max="95" value="70" step="5" 
-                                oninput="updateOverlapDisplay(this.value)">
-                            <div class="slider-labels">
-                                <span>30%</span>
-                                <span>95%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Sector Concentration Setting -->
-                <div class="settings-section">
-                    <h4>Sector Concentration Limit</h4>
-                    <p class="settings-description">Maximum allocation to a single sector before warning</p>
-                    
-                    <div class="setting-item">
-                        <label for="sectorThreshold">
-                            <span class="setting-label">Sector Limit</span>
-                            <span class="setting-current" id="sectorDisplay">40%</span>
-                        </label>
-                        <div class="slider-container">
-                            <input type="range" id="sectorThreshold" min="20" max="80" value="40" step="5" 
-                                oninput="updateSectorDisplay(this.value)">
-                            <div class="slider-labels">
-                                <span>20%</span>
-                                <span>80%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- NEW: Broker Visibility -->
-                <div class="settings-section">
-                    <h4>Broker Visibility</h4>
-                    <p class="settings-description">Choose which brokers to display on the dashboard</p>
-                    
-                    <div class="broker-toggles">
-                        {% for broker in brokers %}
-                        <div class="broker-toggle-item">
-                            <label class="toggle-label">
-                                <input type="checkbox" 
-                                    class="broker-visibility-toggle" 
-                                    data-broker="{{ broker.name }}"
-                                    id="toggle_{{ broker.name }}"
-                                    {% if broker.has_data %}disabled{% endif %}>
-                                <span class="toggle-text">{{ broker.display_name }}</span>
-                            </label>
-                            {% if broker.has_data %}
-                            <span class="broker-status">(has data)</span>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
+                <table class="underlying-table">
+                    <thead><tr><th>Symbol</th><th>Name</th><th>Weight</th><th>Est. Value</th><th>Sector</th><th>Country</th><th>Overlap</th></tr></thead>
+                    <tbody id="underlyingTableBody"></tbody>
+                </table>
             </div>
-            
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="resetRiskDefaults()">
-                    <i class="fas fa-undo"></i> Reset Defaults
-                </button>
-                <button class="btn-primary" onclick="saveRiskSettings()">
-                    <i class="fas fa-save"></i> Save Settings
-                </button>
-            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="closeUnderlyingModal()">Close</button></div>
         </div>
     </div>
-
+    
+    <!-- Settings Modal -->
+    <div class="settings-backdrop" id="settingsBackdrop"></div>
+    <div class="settings-modal" id="settingsModal">
+        <div class="settings-modal-header">
+            <h3><i class="fas fa-sliders-h"></i> Risk Analysis Settings</h3>
+            <button class="modal-close" onclick="closeSettings()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="settings-modal-body">
+            <div class="settings-section">
+                <h4>Stock Concentration Threshold</h4>
+                <p>Individual stocks exceeding this percentage will be flagged as high risk</p>
+                <div class="settings-slider">
+                    <div class="settings-slider-header">
+                        <span class="settings-slider-label">Warning Threshold</span>
+                        <span class="settings-slider-value" id="concentrationThresholdValue">20%</span>
+                    </div>
+                    <input type="range" id="concentrationThreshold" min="5" max="50" value="20">
+                    <div class="settings-slider-range"><span>5%</span><span>50%</span></div>
+                </div>
+            </div>
+            <div class="settings-section">
+                <h4>ETF/Mutual Fund Overlap</h4>
+                <p>Funds with overlap above this threshold will be flagged as redundant</p>
+                <div class="settings-slider">
+                    <div class="settings-slider-header">
+                        <span class="settings-slider-label">Overlap Warning</span>
+                        <span class="settings-slider-value" id="overlapWarningValue">70%</span>
+                    </div>
+                    <input type="range" id="overlapWarning" min="30" max="95" value="70">
+                    <div class="settings-slider-range"><span>30%</span><span>95%</span></div>
+                </div>
+            </div>
+            <div class="settings-section">
+                <h4>Sector Concentration Limit</h4>
+                <p>Maximum allocation to a single sector before warning</p>
+                <div class="settings-slider">
+                    <div class="settings-slider-header">
+                        <span class="settings-slider-label">Sector Limit</span>
+                        <span class="settings-slider-value" id="sectorLimitValue">40%</span>
+                    </div>
+                    <input type="range" id="sectorLimit" min="20" max="80" value="40">
+                    <div class="settings-slider-range"><span>20%</span><span>80%</span></div>
+                </div>
+            </div>
+            <div class="settings-section">
+                <h4>Broker Visibility</h4>
+                <p>Choose which brokers to display on the dashboard</p>
+                <div class="broker-list">
+                    {% for broker in brokers %}
+                    <div class="broker-item {% if broker.has_data %}has-data{% endif %}">
+                        <label>
+                            <input type="checkbox" id="broker-{{ broker.name }}" {% if broker.has_data %}checked disabled{% else %}checked{% endif %}>
+                            <span>{{ broker.display_name }}</span>
+                        </label>
+                        {% if broker.has_data %}<span class="broker-status">(has data)</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="settings-modal-footer">
+            <button class="btn btn-secondary" id="resetSettingsBtn"><i class="fas fa-undo"></i> Reset Defaults</button>
+            <button class="btn btn-primary" id="saveSettingsBtn"><i class="fas fa-save"></i> Save Settings</button>
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Application JavaScript -->
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/broker-cards.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+    
+    <!-- Page Initialization -->
+    <script>
+        // Holdings search filter
+        function filterHoldings() {
+            const searchTerm = document.getElementById('holdingsSearch').value.toLowerCase();
+            document.querySelectorAll('#holdingsTableBody .holding-row').forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+            });
+        }
+        
+        // Initialize risk charts with page data
+        document.addEventListener('DOMContentLoaded', function() {
+            const pageData = getPageData();
+            if (pageData && typeof initCharts === 'function') {
+                initCharts(pageData.riskMetrics);
+            }
+        });
+    </script>
 </body>
 </html>

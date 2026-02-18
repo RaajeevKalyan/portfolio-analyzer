@@ -1,0 +1,319 @@
+/* =============================================================================
+   broker-cards.css - Broker Card Components with Tabs
+   ============================================================================= */
+
+/* =========================================================================
+   Broker Grid Layout
+   ========================================================================= */
+
+.broker-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 1400px) {
+    .broker-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 1024px) {
+    .broker-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .broker-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =========================================================================
+   Broker Card Base
+   ========================================================================= */
+
+.broker-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    transition: all var(--transition-fast);
+}
+
+.broker-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+/* =========================================================================
+   Broker Card Header
+   ========================================================================= */
+
+.broker-header {
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.broker-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.broker-name-section h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.broker-name-section .account-info {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.125rem;
+}
+
+.broker-value-badge {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* =========================================================================
+   Broker Icon Circles - Brand Colors
+   ========================================================================= */
+
+.broker-icon-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.broker-icon-circle.merrill {
+    background: linear-gradient(135deg, #CC0000, #990000);
+}
+
+.broker-icon-circle.fidelity {
+    background: linear-gradient(135deg, #00783E, #005530);
+}
+
+.broker-icon-circle.webull {
+    background: linear-gradient(135deg, #5B21B6, #4C1D95);
+}
+
+.broker-icon-circle.robinhood {
+    background: linear-gradient(135deg, #00C805, #009604);
+}
+
+.broker-icon-circle.schwab {
+    background: linear-gradient(135deg, #00A0DC, #0077A8);
+}
+
+.broker-icon-circle.ally {
+    background: linear-gradient(135deg, #6B2C91, #552370);
+}
+
+.broker-icon-circle.etrade {
+    background: linear-gradient(135deg, #6633CC, #4D2699);
+}
+
+.broker-icon-circle.wellsfargo {
+    background: linear-gradient(135deg, #D71E28, #A01820);
+}
+
+/* =========================================================================
+   Broker Card Tabs
+   ========================================================================= */
+
+.broker-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.broker-tab {
+    flex: 1;
+    padding: 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    border: none;
+    border-bottom: 3px solid transparent;
+    transition: all var(--transition-fast);
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.85rem;
+    background: none;
+}
+
+.broker-tab:hover {
+    background: var(--bg-secondary);
+}
+
+.broker-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background: var(--bg-secondary);
+}
+
+.broker-tab i {
+    margin-right: 0.25rem;
+}
+
+/* =========================================================================
+   Tab Content Area
+   ========================================================================= */
+
+.tab-content-area {
+    padding: 1.25rem;
+    min-height: 280px;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+/* =========================================================================
+   Overview Tab - Chart Container
+   ========================================================================= */
+
+.broker-card .chart-container {
+    position: relative;
+    height: 220px;
+}
+
+/* =========================================================================
+   History Tab - Snapshots Table
+   ========================================================================= */
+
+.snapshots-table {
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+.snapshots-table th {
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    padding: 0.5rem 0.5rem 0.5rem 0;
+    border-bottom: 2px solid var(--border-color);
+    text-align: left;
+}
+
+.snapshots-table th:nth-child(2) { text-align: center; }
+.snapshots-table th:nth-child(3) { text-align: right; }
+
+.snapshots-table td {
+    padding: 0.5rem 0.5rem 0.5rem 0;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    vertical-align: middle;
+}
+
+.snapshots-table tr:last-child td {
+    border-bottom: none;
+}
+
+.snapshot-date {
+    font-weight: 500;
+    font-size: 0.75rem;
+}
+
+.snapshot-positions {
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.snapshot-value {
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.no-snapshots {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+.no-snapshots i {
+    display: block;
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.5;
+}
+
+.no-snapshots p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* =========================================================================
+   Upload Tab - Drag & Drop Zone
+   ========================================================================= */
+
+.upload-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 2rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    background: var(--bg-secondary);
+}
+
+.upload-zone:hover,
+.upload-zone.dragover {
+    border-color: var(--primary-color);
+    background: rgba(102, 126, 234, 0.05);
+}
+
+.upload-icon {
+    font-size: 2.5rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.upload-zone p {
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.upload-zone .text-muted {
+    color: var(--text-muted) !important;
+}
+
+.btn-upload {
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    border: none;
+    color: white;
+    padding: 0.5rem 1.25rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.85rem;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.btn-upload:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    color: white;
+}

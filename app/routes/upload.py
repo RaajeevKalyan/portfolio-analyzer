@@ -252,6 +252,8 @@ def store_portfolio_data(broker_name: str, parsed_data: dict, csv_filename: str)
     Returns:
         int: Created PortfolioSnapshot ID
     """
+    from datetime import datetime as dt
+    
     with db_session() as session:
         # Get or create broker account
         account_last4 = parsed_data.get('account_number_last4')
@@ -277,10 +279,21 @@ def store_portfolio_data(broker_name: str, parsed_data: dict, csv_filename: str)
         broker_account.last_uploaded_at = datetime.utcnow()
         broker_account.last_csv_filename = csv_filename
         
+        # Determine snapshot date - prefer export_timestamp from CSV, fall back to upload time
+        snapshot_date = datetime.utcnow()
+        export_timestamp = parsed_data.get('export_timestamp')
+        if export_timestamp:
+            try:
+                # Parse ISO format timestamp
+                snapshot_date = dt.fromisoformat(export_timestamp)
+                logger.info(f"Using export timestamp from CSV: {snapshot_date}")
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Could not parse export_timestamp '{export_timestamp}': {e}")
+        
         # Create portfolio snapshot
         snapshot = PortfolioSnapshot(
             broker_account_id=broker_account.id,
-            snapshot_date=datetime.utcnow(),
+            snapshot_date=snapshot_date,
             total_value=parsed_data['total_value'],
             total_positions=len(parsed_data['holdings']),
             upload_source='csv_upload',
@@ -314,3 +327,73 @@ def store_portfolio_data(broker_name: str, parsed_data: dict, csv_filename: str)
         
         # Return snapshot ID
         return snapshot.id
+
+
+@upload_bp.route('/api/broker/<broker_name>/snapshots', methods=['GET'])
+def get_broker_snapshots(broker_name):
+    """
+    Get recent snapshots for a broker (for history tab)
+    Returns last 6 snapshots with dates and values - REAL DATA ONLY
+    """
+    try:
+        with db_session() as session:
+            broker = session.query(BrokerAccount).filter_by(
+                broker_name=broker_name.lower()
+            ).first()
+            
+            if not broker:
+                return jsonify({'success': True, 'snapshots': []})
+            
+            snapshots = session.query(PortfolioSnapshot)\
+                .filter(PortfolioSnapshot.broker_account_id == broker.id)\
+                .order_by(PortfolioSnapshot.snapshot_date.desc())\
+                .limit(6)\
+                .all()
+            
+            return jsonify({
+                'success': True,
+                'snapshots': [{
+                    'id': s.id,
+                    'date': s.snapshot_date.strftime('%b %d, %Y %H:%M'),
+                    'total_value': float(s.total_value),
+                    'positions': s.total_positions,
+                    'filename': s.csv_filename
+                } for s in snapshots]
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting snapshots: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@upload_bp.route('/api/broker/<broker_name>/history', methods=['GET'])
+def get_broker_history(broker_name):
+    """
+    Get value history for a broker (for chart)
+    Returns all snapshots for chart plotting - REAL DATA ONLY
+    """
+    try:
+        with db_session() as session:
+            broker = session.query(BrokerAccount).filter_by(
+                broker_name=broker_name.lower()
+            ).first()
+            
+            if not broker:
+                return jsonify({'success': True, 'history': []})
+            
+            snapshots = session.query(PortfolioSnapshot)\
+                .filter(PortfolioSnapshot.broker_account_id == broker.id)\
+                .order_by(PortfolioSnapshot.snapshot_date.asc())\
+                .all()
+            
+            return jsonify({
+                'success': True,
+                'history': [{
+                    'date': s.snapshot_date.strftime('%b %d'),
+                    'value': float(s.total_value)
+                } for s in snapshots]
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting history: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
