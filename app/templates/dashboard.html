@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/holdings.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/risk.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fund-analysis.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/portfolio-projection.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modals.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/progress.css') }}">
 </head>
@@ -43,6 +44,12 @@
                 <h1>Portfolio Risk Analyzer</h1>
             </div>
             <div class="header-actions">
+                <button class="header-btn" onclick="location.reload()" title="Refresh Page">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="header-btn" id="privacyToggle" onclick="togglePrivacyMode()" title="Toggle Privacy Mode">
+                    <i class="fas fa-eye" id="privacyIcon"></i>
+                </button>
                 <button class="header-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle Dark Mode">
                     <i class="fas fa-moon" id="themeIcon"></i>
                 </button>
@@ -244,6 +251,16 @@
                 </div>
             </section>
             
+            <!-- Portfolio Projections Section -->
+            <section class="projection-section">
+                <div id="projectionContainer">
+                    <div class="projection-loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading projections...</p>
+                    </div>
+                </div>
+            </section>
+            
             <!-- Risk Analysis Section -->
             <section class="risk-section">
                 <div class="risk-header">
@@ -378,6 +395,22 @@
         </div>
     </div>
     
+    <!-- Info Panel (slide out from right) -->
+    <div class="info-panel-overlay" id="infoPanelOverlay" onclick="closeInfoPanel()"></div>
+    <div class="info-panel" id="infoPanel">
+        <div class="info-panel-header">
+            <span class="info-panel-title" id="infoPanelTitle">
+                <i class="fas fa-info-circle"></i> Information
+            </span>
+            <button class="info-panel-close" onclick="closeInfoPanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="info-panel-content" id="infoPanelContent">
+            <!-- Content populated by JavaScript -->
+        </div>
+    </div>
+    
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
     
@@ -392,6 +425,7 @@
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
     <script src="{{ url_for('static', filename='js/fund-analysis.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/portfolio-projection.js') }}"></script>
     
     <!-- Page Initialization -->
     <script>

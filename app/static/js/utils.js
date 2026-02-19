@@ -30,8 +30,49 @@ function toggleTheme() {
     setTheme(newTheme);
 }
 
-// Initialize theme on page load
-document.addEventListener('DOMContentLoaded', initTheme);
+/**
+ * Privacy Mode Management
+ * Hides all dollar amounts on the page
+ */
+function initPrivacyMode() {
+    const savedPrivacy = localStorage.getItem('privacyMode') === 'true';
+    setPrivacyMode(savedPrivacy);
+}
+
+function setPrivacyMode(enabled) {
+    document.documentElement.setAttribute('data-privacy', enabled ? 'true' : 'false');
+    localStorage.setItem('privacyMode', enabled.toString());
+    
+    // Update icon
+    const icon = document.getElementById('privacyIcon');
+    if (icon) {
+        icon.className = enabled ? 'fas fa-eye-slash' : 'fas fa-eye';
+    }
+    
+    // Update button title
+    const btn = document.getElementById('privacyToggle');
+    if (btn) {
+        btn.title = enabled ? 'Show Values (Privacy Mode On)' : 'Hide Values (Privacy Mode)';
+    }
+}
+
+function togglePrivacyMode() {
+    const currentPrivacy = document.documentElement.getAttribute('data-privacy') === 'true';
+    setPrivacyMode(!currentPrivacy);
+}
+
+/**
+ * Check if privacy mode is enabled
+ */
+function isPrivacyMode() {
+    return document.documentElement.getAttribute('data-privacy') === 'true';
+}
+
+// Initialize theme and privacy on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initTheme();
+    initPrivacyMode();
+});
 
 /**
  * Format a number with commas and optional decimal places

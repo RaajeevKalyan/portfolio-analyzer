@@ -20,10 +20,19 @@ def get_portfolio_projections():
     """
     Get future portfolio value projections with confidence intervals
     
+    Query params:
+        lookback_years: Years of historical data to use (3, 5, or 10). Default 5.
+    
     Returns:
         JSON with projections and risk metrics
     """
     try:
+        # Get lookback years from query param (default 5)
+        lookback_years = int(request.args.get('lookback_years', 5))
+        # Validate - only allow 3, 5, or 10
+        if lookback_years not in [3, 5, 10]:
+            lookback_years = 5
+        
         # Get current holdings
         aggregator = HoldingsAggregator()
         holdings_data = aggregator.get_aggregated_holdings()
@@ -42,14 +51,16 @@ def get_portfolio_projections():
                         'portfolio_volatility': 0
                     },
                     'projections': [],
-                    'assumptions': {}
+                    'assumptions': {
+                        'lookback_years': lookback_years
+                    }
                 },
                 'message': 'No holdings found'
             })
         
-        # Get projections
+        # Get projections with specified lookback period
         service = PortfolioProjectionService()
-        projection_data = service.get_projection_summary(holdings, total_value)
+        projection_data = service.get_projection_summary(holdings, total_value, lookback_years)
         
         return jsonify({
             'success': True,

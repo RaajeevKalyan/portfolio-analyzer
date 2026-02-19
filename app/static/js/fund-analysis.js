@@ -58,11 +58,12 @@ function clearFundAnalysisCache() {
  */
 async function refreshFundAnalysis() {
     clearFundAnalysisCache();
-    await loadFundAnalysis(true);
+    await runFundAnalysis();
 }
 
 /**
  * Load and display fund expense analysis
+ * Shows placeholder on initial load - user must click to analyze
  */
 async function loadFundAnalysis(forceRefresh = false) {
     const container = document.getElementById('fundAnalysisContainer');
@@ -78,11 +79,69 @@ async function loadFundAnalysis(forceRefresh = false) {
         }
     }
     
+    // Show placeholder state with play button (don't auto-run)
+    container.innerHTML = `
+        <div class="fund-analysis-header">
+            <h2><i class="fas fa-coins"></i> Fund Expense Analysis</h2>
+            <div class="expense-summary">
+                <button class="btn-refresh-round" onclick="runFundAnalysis()" title="Analyze fund expenses">
+                    <i class="fas fa-play"></i>
+                </button>
+                <div class="expense-stat">
+                    <div class="expense-stat-label">Total Annual Fees</div>
+                    <div class="expense-stat-value">—</div>
+                </div>
+                <div class="expense-stat">
+                    <div class="expense-stat-label">Weighted Avg ER</div>
+                    <div class="expense-stat-value">—</div>
+                </div>
+                <div class="expense-stat">
+                    <div class="expense-stat-label">Funds Analyzed</div>
+                    <div class="expense-stat-value">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="fund-analysis-placeholder">
+            <i class="fas fa-search-dollar"></i>
+            <p>Click <i class="fas fa-play"></i> to analyze fund expenses</p>
+            <small>Fetches expense ratios, Morningstar ratings, and peer recommendations</small>
+        </div>
+    `;
+}
+
+/**
+ * Actually run the fund analysis (fetches data from API)
+ */
+async function runFundAnalysis() {
+    const container = document.getElementById('fundAnalysisContainer');
+    if (!container) return;
+    
     // Show loading state
     container.innerHTML = `
+        <div class="fund-analysis-header">
+            <h2><i class="fas fa-coins"></i> Fund Expense Analysis</h2>
+            <div class="expense-summary">
+                <button class="btn-refresh-round" disabled title="Analyzing...">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </button>
+                <div class="expense-stat">
+                    <div class="expense-stat-label">Total Annual Fees</div>
+                    <div class="expense-stat-value">...</div>
+                </div>
+                <div class="expense-stat">
+                    <div class="expense-stat-label">Weighted Avg ER</div>
+                    <div class="expense-stat-value">...</div>
+                </div>
+                <div class="expense-stat">
+                    <div class="expense-stat-label">Funds Analyzed</div>
+                    <div class="expense-stat-value">...</div>
+                </div>
+            </div>
+        </div>
         <div class="fund-analysis-loading">
             <i class="fas fa-spinner fa-spin"></i>
             <p>Analyzing fund expenses...</p>
+            <small>Fetching expense ratios from Morningstar & Yahoo Finance</small>
         </div>
     `;
     
@@ -102,11 +161,14 @@ async function loadFundAnalysis(forceRefresh = false) {
     } catch (error) {
         console.error('Error loading fund analysis:', error);
         container.innerHTML = `
+            <div class="fund-analysis-header">
+                <h2><i class="fas fa-coins"></i> Fund Expense Analysis</h2>
+            </div>
             <div class="fund-analysis-empty">
                 <i class="fas fa-exclamation-circle"></i>
                 <p>Error loading fund analysis</p>
                 <small>${error.message}</small>
-                <button class="btn-refresh" onclick="refreshFundAnalysis()" style="margin-top: 1rem;">
+                <button class="btn-refresh" onclick="runFundAnalysis()" style="margin-top: 1rem;">
                     <i class="fas fa-sync-alt"></i> Retry
                 </button>
             </div>
@@ -126,12 +188,10 @@ function renderFundAnalysis(container, data) {
     container.innerHTML = `
         <div class="fund-analysis-header">
             <h2><i class="fas fa-coins"></i> Fund Expense Analysis</h2>
-            <div class="fund-analysis-actions">
-                <button class="btn-refresh" onclick="refreshFundAnalysis()" title="Refresh fund analysis">
+            <div class="expense-summary">
+                <button class="btn-refresh-round" onclick="refreshFundAnalysis()" title="Refresh fund analysis">
                     <i class="fas fa-sync-alt"></i>
                 </button>
-            </div>
-            <div class="expense-summary">
                 <div class="expense-stat">
                     <div class="expense-stat-label">Total Annual Fees</div>
                     <div class="expense-stat-value ${total_annual_expenses > 500 ? 'warning' : ''}">${formatCurrency(total_annual_expenses || 0)}</div>
@@ -168,7 +228,7 @@ function renderFundAnalysis(container, data) {
             </table>
         </div>
         
-        ${renderPeerRecommendations(peer_recommendations)}
+        ${renderPeerRecommendations(peer_recommendations, top_funds)}
         
         <div class="comparison-chart-container" id="comparisonChartContainer" style="display: none;">
             <div class="comparison-chart-header">
@@ -282,9 +342,22 @@ function renderStarRating(stars) {
 /**
  * Render peer recommendations section
  */
-function renderPeerRecommendations(recommendations) {
+function renderPeerRecommendations(recommendations, topFunds) {
     if (!recommendations || Object.keys(recommendations).length === 0) {
         return '';
+    }
+    
+    // Build a map of category -> funds in that category
+    const categoryFunds = {};
+    if (topFunds) {
+        topFunds.forEach(fund => {
+            if (fund.category && fund.category !== 'Unknown') {
+                if (!categoryFunds[fund.category]) {
+                    categoryFunds[fund.category] = [];
+                }
+                categoryFunds[fund.category].push(fund.symbol);
+            }
+        });
     }
     
     let html = `
@@ -296,10 +369,19 @@ function renderPeerRecommendations(recommendations) {
     for (const [category, peers] of Object.entries(recommendations)) {
         if (peers.length === 0) continue;
         
+        // Get the funds you own in this category
+        const ownedInCategory = categoryFunds[category] || [];
+        const ownedText = ownedInCategory.length > 0 
+            ? `Alternatives for: <strong>${ownedInCategory.join(', ')}</strong>`
+            : '';
+        
         html += `
             <div class="peer-category">
                 <div class="peer-category-header">
-                    <span class="peer-category-name"><i class="fas fa-folder"></i> ${category}</span>
+                    <div>
+                        <span class="peer-category-name"><i class="fas fa-folder"></i> ${category}</span>
+                        ${ownedText ? `<div class="peer-category-owned">${ownedText}</div>` : ''}
+                    </div>
                     <span class="peer-category-count">${peers.length} alternative${peers.length > 1 ? 's' : ''}</span>
                 </div>
                 <div class="peer-cards">

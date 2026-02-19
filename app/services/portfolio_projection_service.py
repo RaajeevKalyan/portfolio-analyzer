@@ -83,7 +83,7 @@ class PortfolioProjectionService:
         except Exception as e:
             logger.warning(f"Error saving projection cache: {e}")
     
-    def get_fund_risk_metrics(self, symbol: str, portfolio_value: float, fund_name: str = "") -> Optional[FundRiskMetrics]:
+    def get_fund_risk_metrics(self, symbol: str, portfolio_value: float, fund_name: str = "", lookback_years: int = 5) -> Optional[FundRiskMetrics]:
         """
         Get risk metrics for a single fund
         
@@ -91,11 +91,12 @@ class PortfolioProjectionService:
             symbol: Fund ticker symbol
             portfolio_value: Current value in portfolio
             fund_name: Display name
+            lookback_years: Years of historical data (3, 5, or 10)
             
         Returns:
             FundRiskMetrics or None if data unavailable
         """
-        cache_key = f"risk_{symbol}"
+        cache_key = f"risk_{symbol}_{lookback_years}y"
         
         # Check cache
         if cache_key in self.cache:
@@ -113,12 +114,12 @@ class PortfolioProjectionService:
             return metrics
         
         try:
-            logger.info(f"Fetching risk metrics for {symbol}...")
+            logger.info(f"Fetching risk metrics for {symbol} ({lookback_years}-year lookback)...")
             ticker = yf.Ticker(symbol)
             
-            # Get historical data (5 years)
+            # Get historical data based on lookback period
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=5*365)
+            start_date = end_date - timedelta(days=lookback_years*365)
             
             hist = ticker.history(start=start_date, end=end_date, interval="1mo")
             
@@ -204,12 +205,13 @@ class PortfolioProjectionService:
             traceback.print_exc()
             return None
     
-    def get_portfolio_risk_metrics(self, holdings: List[Dict]) -> Dict:
+    def get_portfolio_risk_metrics(self, holdings: List[Dict], lookback_years: int = 5) -> Dict:
         """
         Get risk metrics for top 10 funds in portfolio
         
         Args:
             holdings: List of holdings from HoldingsAggregator
+            lookback_years: Years of historical data (3, 5, or 10)
             
         Returns:
             Dict with fund risk metrics and portfolio summary
@@ -227,7 +229,8 @@ class PortfolioProjectionService:
                 'portfolio_beta': 0,
                 'portfolio_sharpe': 0,
                 'portfolio_volatility': 0,
-                'total_analyzed_value': 0
+                'total_analyzed_value': 0,
+                'lookback_years': lookback_years
             }
         
         fund_metrics = []
@@ -241,7 +244,7 @@ class PortfolioProjectionService:
             value = float(holding.get('total_value', 0))
             name = holding.get('name', symbol)
             
-            metrics = self.get_fund_risk_metrics(symbol, value, name)
+            metrics = self.get_fund_risk_metrics(symbol, value, name, lookback_years)
             
             if metrics:
                 fund_metrics.append({
@@ -281,7 +284,8 @@ class PortfolioProjectionService:
             'portfolio_sharpe': round(portfolio_sharpe, 3),
             'portfolio_volatility': round(portfolio_volatility * 100, 2),
             'portfolio_return': round(portfolio_return * 100, 2),
-            'total_analyzed_value': total_value
+            'total_analyzed_value': total_value,
+            'lookback_years': lookback_years
         }
     
     def project_portfolio_value(
@@ -342,15 +346,20 @@ class PortfolioProjectionService:
         
         return projections
     
-    def get_projection_summary(self, holdings: List[Dict], total_value: float) -> Dict:
+    def get_projection_summary(self, holdings: List[Dict], total_value: float, lookback_years: int = 5) -> Dict:
         """
         Get complete projection analysis for dashboard
+        
+        Args:
+            holdings: List of holdings
+            total_value: Total portfolio value
+            lookback_years: Years of historical data (3, 5, or 10)
         
         Returns:
             Dict with projections and risk metrics
         """
         # Get risk metrics first (this gives us historical return and volatility)
-        risk_data = self.get_portfolio_risk_metrics(holdings)
+        risk_data = self.get_portfolio_risk_metrics(holdings, lookback_years)
         
         # Use portfolio metrics if available, otherwise use defaults
         if risk_data['total_analyzed_value'] > 0:
@@ -385,7 +394,8 @@ class PortfolioProjectionService:
                 'historical_return': round(annual_return * 100, 2),
                 'volatility': round(volatility * 100, 2),
                 'inflation_rate': INFLATION_RATE * 100,
-                'risk_free_rate': RISK_FREE_RATE * 100
+                'risk_free_rate': RISK_FREE_RATE * 100,
+                'lookback_years': lookback_years
             },
             'cache_timestamp': self.cache.get('timestamp', 0)
         }

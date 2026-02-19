@@ -8,6 +8,35 @@ let projectionChart = null;
 // Cache key
 const PROJECTION_CACHE_KEY = 'portfolioProjectionData';
 const PROJECTION_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const PROJECTION_YEARS_KEY = 'projectionLookbackYears';
+
+/**
+ * Get the configured lookback years (default 5)
+ */
+function getProjectionYears() {
+    try {
+        const years = localStorage.getItem(PROJECTION_YEARS_KEY);
+        if (years && [3, 5, 10].includes(parseInt(years))) {
+            return parseInt(years);
+        }
+    } catch (e) {}
+    return 5; // Default
+}
+
+/**
+ * Set the lookback years and refresh projections
+ */
+function setProjectionYears(years) {
+    try {
+        localStorage.setItem(PROJECTION_YEARS_KEY, years.toString());
+        // Clear cache since we're changing parameters
+        sessionStorage.removeItem(PROJECTION_CACHE_KEY);
+        // Re-run projections
+        runProjections();
+    } catch (e) {
+        console.error('Error setting projection years:', e);
+    }
+}
 
 /**
  * Get cached projection data
@@ -43,6 +72,7 @@ function cacheProjection(data) {
 
 /**
  * Load portfolio projections and risk metrics
+ * This runs independently and doesn't block other page elements
  */
 async function loadProjections(forceRefresh = false) {
     const container = document.getElementById('projectionContainer');
@@ -57,16 +87,81 @@ async function loadProjections(forceRefresh = false) {
         }
     }
     
+    // Show "ready to analyze" state
+    container.innerHTML = `
+        <div class="projection-header">
+            <h2><i class="fas fa-chart-line"></i> Portfolio Projections</h2>
+            <div class="projection-header-actions">
+                <button class="btn-info-round" onclick="showProjectionInfo()" title="How projections are calculated">
+                    <i class="fas fa-info"></i>
+                </button>
+                <button class="btn-refresh-round" onclick="runProjections()" title="Calculate projections">
+                    <i class="fas fa-play"></i>
+                </button>
+            </div>
+        </div>
+        <div class="projection-summary">
+            <div class="projection-stat">
+                <div class="projection-stat-label">Current Value</div>
+                <div class="projection-stat-value">—</div>
+            </div>
+            <div class="projection-stat">
+                <div class="projection-stat-label">5-Year Projection</div>
+                <div class="projection-stat-value">—</div>
+            </div>
+            <div class="projection-stat">
+                <div class="projection-stat-label">10-Year Projection</div>
+                <div class="projection-stat-value">—</div>
+            </div>
+        </div>
+        <div class="projection-placeholder">
+            <i class="fas fa-calculator"></i>
+            <p>Click <i class="fas fa-play"></i> to calculate projections</p>
+            <small>Analyzes historical returns and volatility of your holdings</small>
+        </div>
+    `;
+    
+    // Auto-run if forceRefresh
+    if (forceRefresh) {
+        await runProjections();
+    }
+}
+
+/**
+ * Actually run the projection calculations
+ */
+async function runProjections() {
+    const container = document.getElementById('projectionContainer');
+    if (!container) return;
+    
+    const lookbackYears = getProjectionYears();
+    
     // Show loading
     container.innerHTML = `
+        <div class="projection-header">
+            <h2><i class="fas fa-chart-line"></i> Portfolio Projections</h2>
+            <div class="projection-header-actions">
+                <div class="years-selector">
+                    <label>Lookback:</label>
+                    <span class="years-loading">${lookbackYears} years</span>
+                </div>
+                <button class="btn-info-round" onclick="showProjectionInfo()" title="How projections are calculated">
+                    <i class="fas fa-info"></i>
+                </button>
+                <button class="btn-refresh-round" disabled title="Calculating...">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </button>
+            </div>
+        </div>
         <div class="projection-loading">
             <i class="fas fa-spinner fa-spin"></i>
             <p>Calculating projections and risk metrics...</p>
+            <small>Fetching ${lookbackYears}-year historical data for your holdings</small>
         </div>
     `;
     
     try {
-        const response = await fetch('/api/portfolio/projections');
+        const response = await fetch(`/api/portfolio/projections?lookback_years=${lookbackYears}`);
         const result = await response.json();
         
         if (!result.success) {
@@ -79,10 +174,16 @@ async function loadProjections(forceRefresh = false) {
     } catch (error) {
         console.error('Error loading projections:', error);
         container.innerHTML = `
+            <div class="projection-header">
+                <h2><i class="fas fa-chart-line"></i> Portfolio Projections</h2>
+            </div>
             <div class="projection-loading">
                 <i class="fas fa-exclamation-circle"></i>
                 <p>Error loading projections</p>
                 <small>${error.message}</small>
+                <button class="btn-refresh" onclick="runProjections()" style="margin-top: 1rem;">
+                    <i class="fas fa-sync-alt"></i> Retry
+                </button>
             </div>
         `;
     }
@@ -93,6 +194,7 @@ async function loadProjections(forceRefresh = false) {
  */
 function renderProjections(container, data) {
     const { current_value, projections, risk_metrics, assumptions } = data;
+    const selectedYears = getProjectionYears();
     
     if (!current_value || current_value === 0) {
         container.innerHTML = `
@@ -113,10 +215,18 @@ function renderProjections(container, data) {
         <div class="projection-header">
             <h2><i class="fas fa-chart-line"></i> Portfolio Projections</h2>
             <div class="projection-header-actions">
+                <div class="years-selector">
+                    <label for="lookbackYears">Lookback:</label>
+                    <select id="lookbackYears" onchange="setProjectionYears(this.value)">
+                        <option value="3" ${selectedYears === 3 ? 'selected' : ''}>3 years</option>
+                        <option value="5" ${selectedYears === 5 ? 'selected' : ''}>5 years</option>
+                        <option value="10" ${selectedYears === 10 ? 'selected' : ''}>10 years</option>
+                    </select>
+                </div>
                 <button class="btn-info-round" onclick="showProjectionInfo()" title="How projections are calculated">
                     <i class="fas fa-info"></i>
                 </button>
-                <button class="btn-refresh-round" onclick="loadProjections(true)" title="Refresh projections">
+                <button class="btn-refresh-round" onclick="runProjections()" title="Refresh projections">
                     <i class="fas fa-sync-alt"></i>
                 </button>
             </div>
@@ -332,11 +442,11 @@ function renderRiskMetrics(risk_metrics) {
                 <thead>
                     <tr>
                         <th>Fund</th>
-                        <th style="text-align: center;">Beta (β)</th>
-                        <th style="text-align: center;">Sharpe</th>
-                        <th style="text-align: center;">Volatility</th>
-                        <th style="text-align: center;">Ann. Return</th>
-                        <th style="text-align: center;">Alpha</th>
+                        <th>Beta (β)</th>
+                        <th>Sharpe</th>
+                        <th>Volatility</th>
+                        <th>Ann. Return</th>
+                        <th>Alpha</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -454,18 +564,39 @@ function showProjectionInfo() {
         </div>
         
         <div class="info-section">
-            <h4>Key Assumptions</h4>
+            <h4>Formulas Used</h4>
+            <div class="info-formula-block">
+                <p><strong>Real Return Rate:</strong></p>
+                <code>Real Return = Historical Return − Inflation Rate</code>
+                <p class="info-formula-example">Example: 12% historical − 3% inflation = 9% real return</p>
+            </div>
+            <div class="info-formula-block">
+                <p><strong>Expected Value (Year N):</strong></p>
+                <code>FV = Current Value × (1 + Real Return)^N</code>
+                <p class="info-formula-example">$70,000 × (1.09)^10 = $165,746</p>
+            </div>
+            <div class="info-formula-block">
+                <p><strong>Best/Worst Case Adjustment:</strong></p>
+                <code>Adjusted Return = Real Return ± (Volatility × √Years / Years)</code>
+                <p class="info-formula-example">±1σ creates the confidence band that widens over time</p>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <h4>Your Portfolio's Inputs</h4>
+            <p>These values are calculated from your holdings' historical performance:</p>
             <ul class="info-list">
-                <li><strong>Historical Return:</strong> Calculated from your funds' past 5-year performance</li>
-                <li><strong>Volatility:</strong> Based on standard deviation of monthly returns</li>
-                <li><strong>Inflation:</strong> Assumed 3% annual rate</li>
-                <li><strong>No additional contributions:</strong> Shows growth of current portfolio only</li>
+                <li><strong>Historical Return:</strong> Compound annual growth rate (CAGR) over the selected lookback period</li>
+                <li><strong>Lookback Period:</strong> Currently set to <strong>${getProjectionYears()} years</strong> (configurable: 3, 5, or 10 years)</li>
+                <li><strong>Volatility (σ):</strong> Annualized standard deviation of monthly returns</li>
+                <li><strong>Inflation Assumption:</strong> 3% per year (historical average)</li>
             </ul>
+            <p class="info-note"><i class="fas fa-cog"></i> You can change the lookback period using the dropdown next to the Projections header.</p>
         </div>
         
         <div class="info-warning">
             <i class="fas fa-exclamation-triangle"></i>
-            <span><strong>Important:</strong> Past performance does not guarantee future results. These projections are estimates based on historical data and should not be considered financial advice.</span>
+            <span><strong>Important:</strong> Past performance does not guarantee future results. These projections are estimates based on historical data and should not be considered financial advice. Actual returns may vary significantly.</span>
         </div>
     `;
     

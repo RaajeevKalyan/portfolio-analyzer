@@ -206,20 +206,26 @@ def compare_fund_with_peers(symbol):
                 'error': f'Fund not found: {symbol}'
             }), 404
         
-        # Get peers in same category
+        # Get peers in same category - use category name even if category_id is empty
         peers = []
-        if fund_data.get('category_id'):
+        category_name = fund_data.get('category', '')
+        if category_name and category_name != 'Unknown':
             peers = analyzer.find_category_peers(
-                category_id=fund_data['category_id'],
-                category_name=fund_data.get('category', ''),
+                category_id=fund_data.get('category_id', ''),
+                category_name=category_name,
                 exclude_symbols=[symbol.upper()],
                 min_rating='Silver'
             )
+            logger.info(f"Found {len(peers)} peers for {symbol} in category '{category_name}'")
         
         # Get NAV history for fund
         fund_nav = []
-        if fund_data.get('security_id'):
-            nav_df = analyzer.get_fund_nav_history(fund_data['security_id'], days)
+        if fund_data.get('security_id') or symbol:
+            nav_df = analyzer.get_fund_nav_history(
+                fund_data.get('security_id', ''), 
+                days, 
+                symbol=symbol.upper()
+            )
             if nav_df is not None:
                 for _, row in nav_df.iterrows():
                     fund_nav.append({
@@ -231,17 +237,21 @@ def compare_fund_with_peers(symbol):
         # Get NAV history for top 3 peers
         peer_navs = {}
         for peer in peers[:3]:
-            if peer.security_id:
-                nav_df = analyzer.get_fund_nav_history(peer.security_id, days)
-                if nav_df is not None:
-                    peer_navs[peer.ticker] = [
-                        {
-                            'date': str(row.get('date', '')),
-                            'nav': float(row.get('nav', 0)),
-                            'total_return': float(row.get('totalReturn', 0))
-                        }
-                        for _, row in nav_df.iterrows()
-                    ]
+            nav_df = analyzer.get_fund_nav_history(
+                peer.security_id if peer.security_id else '', 
+                days,
+                symbol=peer.ticker
+            )
+            if nav_df is not None and len(nav_df) > 0:
+                peer_navs[peer.ticker] = [
+                    {
+                        'date': str(row.get('date', '')),
+                        'nav': float(row.get('nav', 0)),
+                        'total_return': float(row.get('totalReturn', 0))
+                    }
+                    for _, row in nav_df.iterrows()
+                ]
+                logger.info(f"Got {len(peer_navs[peer.ticker])} NAV records for peer {peer.ticker}")
         
         return jsonify({
             'success': True,

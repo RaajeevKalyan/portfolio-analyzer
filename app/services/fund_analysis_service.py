@@ -89,7 +89,12 @@ class FundAnalysisService:
         Get expense ratio from yfinance funds_data
         
         Returns:
-            Tuple of (expense_ratio as decimal, category name)
+            Tuple of (expense_ratio as decimal e.g. 0.0003 for 0.03%, category name)
+            
+        Note: yfinance returns expense ratios in different formats depending on the source:
+              - Some return as percentage (0.03 for 0.03%) 
+              - Some return as decimal (0.0003 for 0.03%)
+              We need to detect which format and normalize to decimal.
         """
         try:
             ticker = yf.Ticker(symbol)
@@ -126,10 +131,12 @@ class FundAnalysisService:
                                     
                                     if val is not None and pd.notna(val):
                                         expense = float(val)
-                                        # Normalize: if > 1, it's likely percentage (e.g., 0.75 means 0.75%)
-                                        if expense > 1:
+                                        # Normalize to decimal format:
+                                        # - If value >= 0.01 (like 0.03, 1.31), it's percentage format -> divide by 100
+                                        # - If value < 0.01 (like 0.0003, 0.0131), it's already decimal
+                                        if expense >= 0.01:
                                             expense = expense / 100
-                                        logger.info(f"  yfinance fund_ops expense for {symbol}: {expense}")
+                                        logger.info(f"  yfinance fund_ops expense for {symbol}: {expense} ({expense*100:.4f}%)")
                                         return expense, category
                         
                         # Try as dict if DataFrame doesn't work
@@ -137,7 +144,7 @@ class FundAnalysisService:
                             for field in ['annualReportExpenseRatio', 'totalExpenseRatio', 'netExpenseRatio']:
                                 if field in fund_ops and fund_ops[field]:
                                     expense = float(fund_ops[field])
-                                    if expense > 1:
+                                    if expense >= 0.01:
                                         expense = expense / 100
                                     return expense, category
                                     
@@ -151,7 +158,7 @@ class FundAnalysisService:
                             for field in ['expenseRatio', 'netExpenseRatio', 'annualReportExpenseRatio']:
                                 if field in overview and overview[field]:
                                     expense = float(overview[field])
-                                    if expense > 1:
+                                    if expense >= 0.01:
                                         expense = expense / 100
                                     return expense, category
                     except Exception as e:
@@ -166,18 +173,16 @@ class FundAnalysisService:
                 'expenseRatio', 
                 'netExpenseRatio', 
                 'totalExpenseRatio',
-                'annualHoldingsTurnover'  # Sometimes this is reported instead
             ]
             
             for field in expense_info_fields:
                 if field in info and info[field] is not None:
                     expense = float(info[field])
-                    # yfinance returns as decimal (0.0075 for 0.75%)
-                    # But sometimes as percentage (0.75 for 0.75%)
-                    if expense > 0.1:  # Likely percentage format
+                    # Normalize: if >= 0.01, it's percentage format
+                    if expense >= 0.01:
                         expense = expense / 100
                     if expense > 0:
-                        logger.info(f"  yfinance info expense for {symbol}: {expense}")
+                        logger.info(f"  yfinance info expense for {symbol}: {expense} ({expense*100:.4f}%)")
                         return expense, category
             
             return 0, category
@@ -441,23 +446,49 @@ class FundAnalysisService:
         
         exclude_symbols = set(s.upper() for s in (exclude_symbols or []))
         
-        logger.info(f"Searching for peers in category: {category_name}")
+        logger.info(f"="*50)
+        logger.info(f"PEER SEARCH for category: '{category_name}'")
+        logger.info(f"  Excluding symbols: {exclude_symbols}")
+        logger.info(f"  Min rating: {min_rating}")
+        logger.info(f"="*50)
         
         peers = []
         
+        # Map category names to better search terms
+        # Morningstar categories have specific names
+        category_search_map = {
+            'Large Blend': ['Large Blend', 'S&P 500', 'Total Stock'],
+            'Large Growth': ['Large Growth'],
+            'Large Value': ['Large Value'],
+            'Mid-Cap Blend': ['Mid-Cap Blend', 'Mid Cap'],
+            'Mid-Cap Growth': ['Mid-Cap Growth'],
+            'Mid-Cap Value': ['Mid-Cap Value'],
+            'Small Blend': ['Small Blend', 'Small Cap'],
+            'Small Growth': ['Small Growth'],
+            'Small Value': ['Small Value'],
+            'Foreign Large Blend': ['Foreign Large', 'International'],
+            'Diversified Emerging Mkts': ['Emerging Markets'],
+            'Technology': ['Technology'],
+        }
+        
+        # Get search terms for this category
+        search_terms = category_search_map.get(category_name, [category_name])
+        
+        # Also add the original category name and individual words
+        if category_name not in search_terms:
+            search_terms.insert(0, category_name)
+        
+        logger.info(f"  Search terms to try: {search_terms}")
+        
         try:
-            # Search for funds using category keywords
-            # Extract key words from category (e.g., "Large Growth" -> search for "Large Growth")
-            search_terms = [category_name]
-            
-            # Also try individual words for broader search
-            words = category_name.split()
-            if len(words) > 1:
-                search_terms.append(words[-1])  # e.g., "Growth" from "Large Growth"
-            
             for search_term in search_terms:
+                if len(peers) >= 10:
+                    break
+                    
                 for inv_type in ["FE", "FO"]:
                     try:
+                        logger.info(f"  Searching: term='{search_term}', type={inv_type}")
+                        
                         results = ms.screener_universe(
                             search_term,
                             language="en-gb",
@@ -470,6 +501,8 @@ class FundAnalysisService:
                             pageSize=50
                         )
                         
+                        logger.info(f"    Got {len(results) if results else 0} results")
+                        
                         if results:
                             for result in results:
                                 meta = result.get("meta", {})
@@ -479,6 +512,7 @@ class FundAnalysisService:
                                 exchange = meta.get("exchange", "") or ""
                                 fund_category = self._get_field_value(fields, "morningstarCategory", "")
                                 medalist = self._get_field_value(fields, "medalistRating", "")
+                                name = self._get_field_value(fields, "name", "")
                                 
                                 # Only US exchanges
                                 if exchange not in ["ARCX", "XNAS", "XNYS", "BATS", "NYSE", "NASDAQ"]:
@@ -486,6 +520,7 @@ class FundAnalysisService:
                                     
                                 # Skip already-owned funds
                                 if ticker in exclude_symbols:
+                                    logger.debug(f"    Skipping {ticker} - already owned")
                                     continue
                                 
                                 # Skip if no ticker
@@ -496,23 +531,37 @@ class FundAnalysisService:
                                 if any(p.ticker == ticker for p in peers):
                                     continue
                                 
+                                # Log what we found for debugging
+                                logger.debug(f"    Found: {ticker} ({name[:30]}...) - Category: {fund_category}, Rating: {medalist}")
+                                
                                 # Filter by medalist rating
                                 if min_rating == "Gold" and medalist != "Gold":
                                     continue
                                 if min_rating == "Silver" and medalist not in ["Gold", "Silver"]:
+                                    logger.debug(f"    Skipping {ticker} - rating {medalist} doesn't meet {min_rating}")
                                     continue
                                 
-                                # Category must somewhat match
+                                # Category matching - be more flexible
                                 if category_name and fund_category:
                                     cat_lower = category_name.lower()
                                     fund_cat_lower = fund_category.lower()
+                                    
+                                    # Direct match
+                                    if cat_lower == fund_cat_lower:
+                                        pass  # Perfect match
                                     # Check for overlap in category words
-                                    cat_words = set(cat_lower.split())
-                                    fund_words = set(fund_cat_lower.split())
-                                    if not cat_words.intersection(fund_words):
-                                        continue
+                                    else:
+                                        cat_words = set(cat_lower.replace('-', ' ').split())
+                                        fund_words = set(fund_cat_lower.replace('-', ' ').split())
+                                        common_words = cat_words.intersection(fund_words)
+                                        
+                                        # Need at least one meaningful word match
+                                        meaningful_common = common_words - {'cap', 'fund', 'index', 'the', 'a'}
+                                        if not meaningful_common:
+                                            logger.debug(f"    Skipping {ticker} - category mismatch: '{fund_category}' vs '{category_name}'")
+                                            continue
                                 
-                                # Get expense ratio from mstarpy
+                                # Get expense ratio
                                 expense_ratio_pct = self._get_field_value(fields, "ongoingCharge", 0)
                                 expense_ratio = (expense_ratio_pct / 100) if expense_ratio_pct else 0
                                 
@@ -522,7 +571,7 @@ class FundAnalysisService:
                                 
                                 peer = PeerFund(
                                     security_id=meta.get("securityID", ""),
-                                    name=self._get_field_value(fields, "name", "Unknown"),
+                                    name=name or "Unknown",
                                     ticker=ticker,
                                     expense_ratio=expense_ratio,
                                     medalist_rating=medalist or "Unknown",
@@ -533,14 +582,11 @@ class FundAnalysisService:
                                     fund_size=self._get_field_value(fields, "fundSize", 0) or 0
                                 )
                                 peers.append(peer)
+                                logger.info(f"    ✓ Added peer: {ticker} ({medalist}, ER: {expense_ratio*100:.2f}%)")
                                 
                     except Exception as e:
-                        logger.warning(f"Error in peer search for {search_term}: {e}")
+                        logger.warning(f"    Error in peer search for '{search_term}': {e}")
                         continue
-                
-                # If we found enough peers, stop searching
-                if len(peers) >= 10:
-                    break
         
         except Exception as e:
             logger.error(f"Error searching for peers: {e}")
@@ -551,13 +597,17 @@ class FundAnalysisService:
         rating_order = {"Gold": 0, "Silver": 1, "Bronze": 2, "Neutral": 3, "Negative": 4, "Unknown": 5}
         peers.sort(key=lambda x: (rating_order.get(x.medalist_rating, 5), x.expense_ratio))
         
-        logger.info(f"Found {len(peers)} peer funds for category '{category_name}'")
+        logger.info(f"  FINAL: Found {len(peers)} peer funds for category '{category_name}'")
+        for p in peers[:5]:
+            logger.info(f"    - {p.ticker}: {p.medalist_rating}, ER={p.expense_ratio*100:.2f}%")
+        
         return peers[:10]
     
     def get_fund_nav_history(
         self, 
         security_id: str, 
-        days: int = 365
+        days: int = 365,
+        symbol: str = None
     ) -> Optional[pd.DataFrame]:
         """
         Get historical NAV data for a fund
@@ -565,32 +615,56 @@ class FundAnalysisService:
         Args:
             security_id: Morningstar security ID
             days: Number of days of history
+            symbol: Ticker symbol (for yfinance fallback)
             
         Returns:
             DataFrame with date, nav, totalReturn columns
         """
-        if not security_id:
-            return None
+        # Try mstarpy first if we have security_id
+        if security_id:
+            try:
+                fund = ms.Funds(security_id)
+                
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=days)
+                
+                history = fund.nav(
+                    start_date=start_date,
+                    end_date=end_date,
+                    frequency="daily"
+                )
+                
+                if history:
+                    df = pd.DataFrame(history)
+                    logger.info(f"Got {len(df)} NAV records from mstarpy for {security_id}")
+                    return df
+                
+            except Exception as e:
+                logger.warning(f"mstarpy NAV failed for {security_id}: {e}")
         
-        try:
-            fund = ms.Funds(security_id)
-            
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
-            
-            history = fund.nav(
-                start_date=start_date,
-                end_date=end_date,
-                frequency="daily"
-            )
-            
-            if history:
-                df = pd.DataFrame(history)
-                logger.info(f"Got {len(df)} NAV records for {security_id}")
-                return df
-            
-        except Exception as e:
-            logger.error(f"Error getting NAV history for {security_id}: {e}")
+        # Fallback to yfinance if we have symbol
+        if symbol:
+            try:
+                logger.info(f"Trying yfinance for {symbol} historical data...")
+                ticker = yf.Ticker(symbol)
+                
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=days)
+                
+                hist = ticker.history(start=start_date, end=end_date, interval="1d")
+                
+                if hist is not None and not hist.empty:
+                    # Convert to NAV-like format
+                    df = pd.DataFrame({
+                        'date': hist.index.strftime('%Y-%m-%d'),
+                        'nav': hist['Close'].values,
+                        'totalReturn': hist['Close'].values  # Use close price as proxy
+                    })
+                    logger.info(f"Got {len(df)} price records from yfinance for {symbol}")
+                    return df
+                    
+            except Exception as e:
+                logger.warning(f"yfinance history failed for {symbol}: {e}")
         
         return None
     

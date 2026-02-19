@@ -69,6 +69,61 @@
     font-size: 0.875rem;
 }
 
+.btn-refresh-small {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-left: 0.5rem;
+}
+
+.btn-refresh-small:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.btn-refresh-small i {
+    font-size: 0.75rem;
+}
+
+.btn-refresh-round {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    padding: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+}
+
+.btn-refresh-round:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    background: var(--bg-secondary);
+}
+
+.btn-refresh-round:active {
+    transform: scale(0.95);
+}
+
+.btn-refresh-round i {
+    font-size: 0.8rem;
+}
+
 .expense-summary {
     display: flex;
     gap: 1.5rem;
@@ -324,6 +379,16 @@
 .peer-category-name i {
     color: var(--text-muted);
     font-size: 0.8rem;
+}
+
+.peer-category-owned {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.peer-category-owned strong {
+    color: var(--primary-color);
 }
 
 .peer-category-count {

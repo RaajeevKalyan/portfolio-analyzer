@@ -76,6 +76,47 @@
     font-size: 0.75rem;
 }
 
+/* Years selector dropdown */
+.years-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-right: 0.5rem;
+}
+
+.years-selector label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.years-selector select {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.years-selector select:hover {
+    border-color: var(--primary-color);
+}
+
+.years-selector select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.years-loading {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 /* =========================================================================
    Projection Summary Stats
    ========================================================================= */
@@ -270,6 +311,7 @@
 .risk-metrics-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 
 .risk-metrics-table thead th {
@@ -279,9 +321,14 @@
     font-size: 0.7rem;
     text-transform: uppercase;
     padding: 0.75rem 0.5rem;
-    text-align: left;
+    text-align: center;
     border-bottom: 2px solid var(--border-color);
     white-space: nowrap;
+}
+
+.risk-metrics-table thead th:first-child {
+    text-align: left;
+    width: 25%;
 }
 
 .risk-metrics-table tbody tr {
@@ -296,6 +343,11 @@
     padding: 0.6rem 0.5rem;
     color: var(--text-primary);
     font-size: 0.85rem;
+    text-align: center;
+}
+
+.risk-metrics-table tbody td:first-child {
+    text-align: left;
 }
 
 .risk-symbol {
@@ -403,6 +455,42 @@
 
 .assumptions-note strong {
     color: var(--text-secondary);
+}
+
+/* =========================================================================
+   Placeholder State (before analysis runs)
+   ========================================================================= */
+
+.projection-placeholder,
+.fund-analysis-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    border: 2px dashed var(--border-color);
+}
+
+.projection-placeholder i,
+.fund-analysis-placeholder i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.projection-placeholder p,
+.fund-analysis-placeholder p {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.projection-placeholder small,
+.fund-analysis-placeholder small {
+    font-size: 0.8rem;
+    opacity: 0.7;
 }
 
 /* =========================================================================
@@ -636,4 +724,51 @@
     font-size: 0.8rem;
     color: var(--text-secondary);
     line-height: 1.5;
+}
+
+/* Formula blocks */
+.info-formula-block {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    margin: 0.75rem 0;
+}
+
+.info-formula-block p {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.8rem;
+}
+
+.info-formula-block code {
+    display: block;
+    font-family: 'Fira Code', 'Monaco', monospace;
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    background: var(--bg-card);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+}
+
+.info-formula-example {
+    font-size: 0.75rem !important;
+    color: var(--text-muted) !important;
+    font-style: italic;
+    margin-top: 0.5rem !important;
+}
+
+.info-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    margin-top: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.info-note i {
+    color: var(--primary-color);
 }

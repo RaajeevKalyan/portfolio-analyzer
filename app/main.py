@@ -100,9 +100,11 @@ def register_routes(app):
     from app.routes.upload import upload_bp
     from app.routes.holdings import holdings_bp
     from app.routes.fund_analysis import fund_analysis_bp
+    from app.routes.portfolio_projection import portfolio_projection_bp
     app.register_blueprint(upload_bp)
     app.register_blueprint(holdings_bp)
     app.register_blueprint(fund_analysis_bp)
+    app.register_blueprint(portfolio_projection_bp)
     
     @app.route('/')
     def dashboard():

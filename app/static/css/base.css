@@ -1,4 +1,52 @@
 /* =============================================================================
+   Privacy Mode - Hide dollar amounts
+   ============================================================================= */
+
+[data-privacy="true"] .box-value,
+[data-privacy="true"] .projection-stat-value,
+[data-privacy="true"] .projection-stat-subtext,
+[data-privacy="true"] .risk-summary-value,
+[data-privacy="true"] .expense-stat-value,
+[data-privacy="true"] .holding-value,
+[data-privacy="true"] .total-value,
+[data-privacy="true"] .broker-value,
+[data-privacy="true"] .broker-card-value,
+[data-privacy="true"] .broker-total,
+[data-privacy="true"] .broker-value-badge,
+[data-privacy="true"] .card-value,
+[data-privacy="true"] .account-value,
+[data-privacy="true"] .net-worth-box .box-value,
+[data-privacy="true"] .annual-expense,
+[data-privacy="true"] td.holding-value,
+[data-privacy="true"] .assumptions-note,
+[data-privacy="true"] .snapshot-value,
+[data-privacy="true"] .history-value {
+    filter: blur(8px);
+    user-select: none;
+    transition: filter 0.2s;
+}
+
+[data-privacy="true"] .box-value:hover,
+[data-privacy="true"] .projection-stat-value:hover,
+[data-privacy="true"] .projection-stat-subtext:hover,
+[data-privacy="true"] .risk-summary-value:hover,
+[data-privacy="true"] .expense-stat-value:hover,
+[data-privacy="true"] .holding-value:hover,
+[data-privacy="true"] .total-value:hover,
+[data-privacy="true"] .broker-value:hover,
+[data-privacy="true"] .broker-card-value:hover,
+[data-privacy="true"] .broker-total:hover,
+[data-privacy="true"] .broker-value-badge:hover,
+[data-privacy="true"] .card-value:hover,
+[data-privacy="true"] .account-value:hover,
+[data-privacy="true"] .net-worth-box .box-value:hover,
+[data-privacy="true"] .annual-expense:hover,
+[data-privacy="true"] .snapshot-value:hover,
+[data-privacy="true"] .history-value:hover {
+    filter: blur(0);
+}
+
+/* =============================================================================
    base.css - CSS Variables, Reset, and Base Styles
    ============================================================================= */
 
