@@ -1,0 +1,373 @@
+/* =============================================================================
+   Top Holdings - Aggregated stock holdings across portfolios
+   ============================================================================= */
+
+/* =========================================================================
+   Container and Header
+   ========================================================================= */
+
+.top-holdings-container {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.top-holdings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.top-holdings-header h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.top-holdings-header h2 i {
+    color: var(--primary-color);
+}
+
+.top-holdings-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* =========================================================================
+   Summary Stats
+   ========================================================================= */
+
+.top-holdings-summary {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.top-holdings-stat {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1.25rem;
+    min-width: 140px;
+    text-align: center;
+}
+
+.top-holdings-stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+}
+
+.top-holdings-stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.top-holdings-stat-value.highlight {
+    color: var(--primary-color);
+}
+
+/* =========================================================================
+   Holdings Table
+   ========================================================================= */
+
+.top-holdings-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.top-holdings-table thead th {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    padding: 0.75rem 0.5rem;
+    text-align: left;
+    border-bottom: 2px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.top-holdings-table thead th:nth-child(n+3) {
+    text-align: right;
+}
+
+.top-holdings-table tbody tr {
+    border-bottom: 1px solid var(--border-light);
+    transition: background 0.15s;
+}
+
+.top-holdings-table tbody tr:hover {
+    background: var(--bg-secondary);
+}
+
+.top-holdings-table tbody td {
+    padding: 0.75rem 0.5rem;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    vertical-align: middle;
+}
+
+.top-holdings-table tbody td:nth-child(n+3) {
+    text-align: right;
+}
+
+/* Stock info cell */
+.stock-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.stock-symbol {
+    font-weight: 600;
+    color: var(--primary-color);
+    font-size: 0.9rem;
+}
+
+.stock-name {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Rank badge */
+.rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.rank-badge.top-3 {
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    color: white;
+}
+
+/* Value breakdown */
+.value-breakdown {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+}
+
+.value-total {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.value-detail {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.value-direct {
+    color: var(--success-color);
+    font-weight: 500;
+}
+
+.value-indirect {
+    color: var(--warning-color);
+    font-weight: 500;
+}
+
+/* Direct and indirect breakdown cells */
+.direct-breakdown,
+.indirect-breakdown {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.2rem;
+}
+
+.shares-count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* Source indicator */
+.source-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.65rem;
+    font-weight: 500;
+}
+
+.source-badge.direct {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success-color);
+}
+
+.source-badge.indirect {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning-color);
+}
+
+.source-badge.both {
+    background: rgba(102, 126, 234, 0.1);
+    color: var(--primary-color);
+}
+
+/* Fund sources tooltip */
+.fund-sources {
+    position: relative;
+    cursor: help;
+}
+
+.fund-sources-count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-decoration: underline dotted;
+}
+
+.fund-sources-tooltip {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    min-width: 200px;
+    max-width: 300px;
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+}
+
+.fund-sources:hover .fund-sources-tooltip {
+    display: block;
+}
+
+.fund-source-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 0.75rem;
+}
+
+.fund-source-item:last-child {
+    border-bottom: none;
+}
+
+.fund-source-name {
+    color: var(--text-secondary);
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fund-source-value {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* =========================================================================
+   Sector/Country badges
+   ========================================================================= */
+
+.sector-badge {
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.65rem;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+/* =========================================================================
+   Loading and Empty States
+   ========================================================================= */
+
+.top-holdings-loading,
+.top-holdings-empty,
+.top-holdings-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    color: var(--text-muted);
+}
+
+.top-holdings-loading i,
+.top-holdings-empty i,
+.top-holdings-placeholder i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.top-holdings-loading p,
+.top-holdings-empty p,
+.top-holdings-placeholder p {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.top-holdings-placeholder {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    border: 2px dashed var(--border-color);
+}
+
+/* =========================================================================
+   Responsive
+   ========================================================================= */
+
+@media (max-width: 768px) {
+    .top-holdings-table {
+        font-size: 0.8rem;
+    }
+    
+    .top-holdings-table thead th,
+    .top-holdings-table tbody td {
+        padding: 0.5rem 0.35rem;
+    }
+    
+    .stock-name {
+        max-width: 120px;
+    }
+    
+    .top-holdings-summary {
+        justify-content: center;
+    }
+}

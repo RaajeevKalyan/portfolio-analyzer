@@ -96,9 +96,27 @@ function formatCurrency(num) {
 /**
  * Format a number as percentage
  */
-function formatPercent(num, decimals = 1) {
+/**
+ * Format a number as a percentage
+ * 
+ * @param {number} num - The number to format. Can be:
+ *   - Decimal (0.0705 meaning 7.05%) - will multiply by 100
+ *   - Already percentage (7.05 meaning 7.05%) - will NOT multiply
+ * @param {number} decimals - Decimal places to show
+ * @param {boolean} isDecimal - If true, multiply by 100 (default: auto-detect)
+ * @returns {string} Formatted percentage string
+ */
+function formatPercent(num, decimals = 1, isDecimal = null) {
     if (num === null || num === undefined || isNaN(num)) return '0%';
-    return formatNumber(num, decimals) + '%';
+    
+    // Auto-detect format: if value is < 1, it's likely decimal format
+    // (no holding would be less than 1% typically displayed as percentage)
+    if (isDecimal === null) {
+        isDecimal = Math.abs(num) < 1;
+    }
+    
+    const value = isDecimal ? num * 100 : num;
+    return formatNumber(value, decimals) + '%';
 }
 
 /**
