@@ -129,6 +129,18 @@ class StockInfoService:
         '.JK': 'Indonesia',       # Jakarta
         '.BK': 'Thailand',        # Bangkok
         '.KL': 'Malaysia',        # Kuala Lumpur
+        '.JO': 'South Africa',    # Johannesburg
+        '.VI': 'Austria',         # Vienna
+        '.CO': 'Denmark',         # Copenhagen
+        '.HE': 'Finland',         # Helsinki
+        '.OL': 'Norway',          # Oslo
+        '.ST': 'Sweden',          # Stockholm
+        '.LS': 'Portugal',        # Lisbon
+        '.AT': 'Greece',          # Athens
+        '.PR': 'Czech Republic',  # Prague
+        '.WA': 'Poland',          # Warsaw
+        '.IS': 'Turkey',          # Istanbul
+        '.TA': 'Israel',          # Tel Aviv
     }
     
     def __init__(self):
@@ -253,6 +265,11 @@ class StockInfoService:
         """
         variants = [symbol]  # Always try original first
         
+        # Skip Morningstar security IDs (start with 0P or F0, or are long alphanumeric)
+        if self._is_morningstar_id(symbol):
+            logger.debug(f"Skipping Morningstar ID: {symbol}")
+            return variants  # Just try original, don't add variants
+        
         # If symbol has a dash, also try with dot
         if '-' in symbol:
             dot_version = symbol.replace('-', '.')
@@ -270,7 +287,53 @@ class StockInfoService:
             if base not in variants:
                 variants.append(base)
         
+        # Only add international suffixes if symbol doesn't already have one
+        # AND it looks like it could be international
+        if '.' not in symbol:
+            # For numeric symbols (Asian stocks), try Asian exchanges
+            if symbol and symbol[0].isdigit():
+                # Likely Asian stock - try common exchanges
+                asian_suffixes = ['.TW', '.KS', '.HK', '.T', '.SS', '.SZ']
+                
+                # For Hong Kong, handle leading zeros
+                clean_symbol = symbol.lstrip('0') or '0'
+                if clean_symbol != symbol:
+                    variants.append(f"{clean_symbol}.HK")
+                    if len(clean_symbol) < 4:
+                        variants.append(f"{clean_symbol.zfill(4)}.HK")
+                
+                for suffix in asian_suffixes:
+                    variant = f"{symbol}{suffix}"
+                    if variant not in variants:
+                        variants.append(variant)
+            
+            # For alphabetic symbols, DON'T automatically try all international exchanges
+            # Only try if it's a short symbol (1-4 chars) that's likely to be non-US
+            # Most US stocks work without suffix, so failed lookups are likely just delisted/invalid
+        
         return variants
+    
+    def _is_morningstar_id(self, symbol: str) -> bool:
+        """
+        Check if this looks like a Morningstar security ID rather than a ticker
+        
+        Morningstar IDs look like: 0P0000CQ68, F00000J3JR, FOUSA00H56
+        """
+        if not symbol:
+            return False
+        
+        # Morningstar IDs typically:
+        # - Start with 0P, F0, or FOUSA
+        # - Are 10+ characters
+        # - Are alphanumeric with mixed case patterns
+        if symbol.startswith(('0P', 'F0', 'FOUSA')):
+            return True
+        
+        # Long alphanumeric strings with numbers mixed in
+        if len(symbol) >= 10 and any(c.isdigit() for c in symbol) and any(c.isalpha() for c in symbol):
+            return True
+        
+        return False
     
     def _infer_country_from_ticker(self, symbol: str) -> Optional[str]:
         """
@@ -371,18 +434,36 @@ class StockInfoService:
                 
                 # Check if we got meaningful data (not just empty/error response)
                 # yfinance sometimes returns a dict with just 'trailingPegRatio' for invalid tickers
-                if 'sector' not in info and 'country' not in info and 'industry' not in info:
-                    if 'longName' not in info and 'shortName' not in info:
-                        logger.warning(f"Incomplete response for {variant}, trying next variant")
-                        continue
+                quote_type = info.get('quoteType', '')
+                
+                # For mutual funds and ETFs, they have 'category' instead of 'sector'
+                # and typically no 'country' field
+                is_fund = quote_type in ['MUTUALFUND', 'ETF']
+                
+                if not is_fund:
+                    # For stocks, we need sector or country
+                    if 'sector' not in info and 'country' not in info and 'industry' not in info:
+                        if 'longName' not in info and 'shortName' not in info:
+                            logger.warning(f"Incomplete response for {variant}, trying next variant")
+                            continue
                 
                 # Extract relevant fields
                 sector = info.get('sector')
-                if not sector or sector == 'Unknown':
-                    sector = info.get('category', 'Unknown')
-                
                 industry = info.get('industry', 'Unknown')
                 country = info.get('country', 'Unknown')
+                category = info.get('category', '')
+                
+                # For mutual funds/ETFs, use category as sector (e.g., "Large Blend", "Large Growth")
+                if is_fund:
+                    if category:
+                        sector = category
+                    if not country or country == 'Unknown':
+                        # Most Fidelity/Vanguard funds are US-based
+                        country = 'United States'
+                    logger.debug(f"Fund {variant}: category={category}, using sector={sector}, country={country}")
+                
+                if not sector or sector == 'Unknown':
+                    sector = category if category else 'Unknown'
                 
                 # If country not found, try to infer from ticker suffix
                 if country == 'Unknown' or not country:

@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 from app.database import db_session
 from app.models import BrokerAccount, PortfolioSnapshot, Holding
 from app.services.merrill_csv_parser import MerrillCSVParser
+from app.services.fidelity_csv_parser import FidelityCSVParser
 from datetime import datetime
 from decimal import Decimal
 import os
@@ -27,9 +28,10 @@ ALLOWED_EXTENSIONS = {'csv'}
 # Broker parser mapping
 PARSERS = {
     'merrill': MerrillCSVParser,
+    'fidelity': FidelityCSVParser,
     # Add more as we implement them:
-    # 'fidelity': FidelityCSVParser,
     # 'webull': WebullCSVParser,
+    # 'schwab': SchwabCSVParser,
     # etc.
 }
 

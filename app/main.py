@@ -101,10 +101,12 @@ def register_routes(app):
     from app.routes.holdings import holdings_bp
     from app.routes.fund_analysis import fund_analysis_bp
     from app.routes.portfolio_projection import portfolio_projection_bp
+    from app.routes.top_holdings import top_holdings_bp
     app.register_blueprint(upload_bp)
     app.register_blueprint(holdings_bp)
     app.register_blueprint(fund_analysis_bp)
     app.register_blueprint(portfolio_projection_bp)
+    app.register_blueprint(top_holdings_bp)
     
     @app.route('/')
     def dashboard():
@@ -177,6 +179,9 @@ def register_routes(app):
             print("Getting holdings...", file=sys.stderr)
             holdings_data = get_current_holdings()
             holdings = holdings_data.get('holdings', [])
+            
+            # Sort holdings by allocation percentage (descending)
+            holdings = sorted(holdings, key=lambda h: float(h.get('allocation_pct', 0)), reverse=True)
             
             # Extract cash vs investment data
             total_cash = float(holdings_data.get('total_cash', 0))

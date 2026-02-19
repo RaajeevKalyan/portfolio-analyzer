@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/risk.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fund-analysis.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/portfolio-projection.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/top-holdings.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modals.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/progress.css') }}">
 </head>
@@ -251,6 +252,16 @@
                 </div>
             </section>
             
+            <!-- Top Stock Holdings Section -->
+            <section class="top-holdings-section">
+                <div id="topHoldingsContainer" class="top-holdings-container">
+                    <div class="top-holdings-loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading top holdings...</p>
+                    </div>
+                </div>
+            </section>
+            
             <!-- Portfolio Projections Section -->
             <section class="projection-section">
                 <div id="projectionContainer">
@@ -426,6 +437,7 @@
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
     <script src="{{ url_for('static', filename='js/fund-analysis.js') }}"></script>
     <script src="{{ url_for('static', filename='js/portfolio-projection.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/top-holdings.js') }}"></script>
     
     <!-- Page Initialization -->
     <script>
@@ -442,6 +454,17 @@
             const pageData = getPageData();
             if (pageData && typeof initCharts === 'function') {
                 initCharts(pageData.riskMetrics);
+            }
+            
+            // Load analysis sections (they show placeholders first)
+            if (typeof loadFundAnalysis === 'function') {
+                loadFundAnalysis();
+            }
+            if (typeof loadTopHoldings === 'function') {
+                loadTopHoldings();
+            }
+            if (typeof loadProjections === 'function') {
+                loadProjections();
             }
         });
     </script>

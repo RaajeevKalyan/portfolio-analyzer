@@ -158,6 +158,18 @@ class HoldingsResolver:
             # STEP 4: Process holdings DataFrame
             underlying = []
             
+            # First, determine the weight format by looking at the sum
+            # mstarpy returns percentages (sum ~= 100)
+            # If sum > 10, it's percentage format; if sum < 2, it's decimal format
+            all_weights = [float(row['weighting']) for _, row in holdings_df.iterrows() 
+                          if pd.notna(row.get('weighting')) and float(row['weighting']) > 0]
+            weight_sum = sum(all_weights)
+            
+            # Determine format: if sum > 10, it's percentage (should sum to ~100)
+            # If sum < 2, it's decimal (should sum to ~1.0)
+            is_percentage_format = weight_sum > 10
+            logger.info(f"  Weight sum: {weight_sum:.2f} - format: {'percentage' if is_percentage_format else 'decimal'}")
+            
             for idx, row in holdings_df.iterrows():
                 try:
                     ticker = None
@@ -167,20 +179,42 @@ class HoldingsResolver:
                         ticker = str(row['secId']).strip().upper()
                     
                     name = str(row['securityName']).strip() if pd.notna(row.get('securityName')) else ''
-                    weight = float(row['weighting']) if pd.notna(row.get('weighting')) else 0.0
+                    raw_weight = float(row['weighting']) if pd.notna(row.get('weighting')) else 0.0
                     
-                    if not ticker or weight == 0:
+                    # Get shares directly from mstarpy if available
+                    mstar_shares = float(row['numberOfShare']) if pd.notna(row.get('numberOfShare')) else None
+                    mstar_market_value = float(row['marketValue']) if pd.notna(row.get('marketValue')) else None
+                    
+                    if not ticker or raw_weight == 0:
                         continue
                     
-                    weight_decimal = weight / 100.0
+                    # Convert to decimal based on detected format
+                    if is_percentage_format:
+                        # Percentage format (13.23 = 13.23%) -> divide by 100
+                        weight_decimal = raw_weight / 100.0
+                    else:
+                        # Already decimal format (0.1323 = 13.23%)
+                        weight_decimal = raw_weight
+                    
                     estimated_value = float(total_value) * weight_decimal
+                    
+                    # Calculate shares: use mstarpy data to derive price, then calculate our shares
+                    estimated_shares = None
+                    if mstar_shares and mstar_market_value and mstar_shares > 0:
+                        # mstar_market_value is the fund's total holding value
+                        # mstar_shares is the fund's total shares
+                        # stock_price = mstar_market_value / mstar_shares
+                        stock_price = mstar_market_value / mstar_shares
+                        if stock_price > 0:
+                            # Our shares = our_value / stock_price
+                            estimated_shares = round(estimated_value / stock_price, 4)
                     
                     underlying.append({
                         'symbol': ticker,
                         'name': name or ticker,
                         'weight': round(weight_decimal, 6),
                         'value': round(estimated_value, 2),
-                        'shares': None
+                        'shares': estimated_shares
                     })
                     
                 except Exception as e:

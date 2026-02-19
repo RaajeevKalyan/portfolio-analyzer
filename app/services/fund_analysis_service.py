@@ -89,17 +89,48 @@ class FundAnalysisService:
         Get expense ratio from yfinance funds_data
         
         Returns:
-            Tuple of (expense_ratio as decimal e.g. 0.0003 for 0.03%, category name)
+            Tuple of (expense_ratio as decimal e.g. 0.0131 for 1.31%, category name)
             
-        Note: yfinance returns expense ratios in different formats depending on the source:
-              - Some return as percentage (0.03 for 0.03%) 
-              - Some return as decimal (0.0003 for 0.03%)
-              We need to detect which format and normalize to decimal.
+        Note: yfinance returns expense ratios inconsistently:
+              - ETFs often return decimal (0.0003 for 0.03%)
+              - Mutual funds often return percentage (1.31 for 1.31%)
+              We detect based on realistic expense ratio ranges.
         """
         try:
             ticker = yf.Ticker(symbol)
             info = ticker.info or {}
             category = info.get('category', '')
+            
+            def normalize_expense_ratio(raw_value: float, source: str) -> float:
+                """
+                Normalize expense ratio to decimal format.
+                
+                yfinance returns values in two formats:
+                1. Decimal format: 0.0131 means 1.31% (most common for mutual funds)
+                2. Percentage format: 1.31 means 1.31% (less common)
+                
+                Detection: Real expense ratios are 0.01% to 3%
+                - In decimal: 0.0001 to 0.03
+                - In percentage: 0.01 to 3.0
+                
+                Threshold: If value > 0.05, it's definitely percentage format
+                (because 0.05 as decimal = 5%, which is unrealistically high)
+                """
+                if raw_value <= 0:
+                    return 0
+                
+                logger.info(f"    {symbol} [{source}]: raw = {raw_value}")
+                
+                # If > 0.05, it must be percentage format (no fund has 5%+ expense ratio)
+                if raw_value > 0.05:
+                    result = raw_value / 100
+                    logger.info(f"    {symbol}: {raw_value} -> {result} (÷100, was percentage format)")
+                    return result
+                else:
+                    # Value <= 0.05: already in decimal format
+                    # Examples: 0.0131 = 1.31%, 0.0003 = 0.03%, 0.03 = 3%
+                    logger.info(f"    {symbol}: {raw_value} -> {raw_value} (kept, already decimal)")
+                    return raw_value
             
             # Method 1: Try funds_data (newer yfinance API)
             try:
@@ -109,7 +140,6 @@ class FundAnalysisService:
                     try:
                         fund_ops = funds_data.fund_operations
                         if fund_ops is not None and hasattr(fund_ops, 'empty') and not fund_ops.empty:
-                            # Try various expense ratio field names
                             expense_fields = [
                                 'Annual Report Expense Ratio (net)',
                                 'Annual Report Net Expense Ratio', 
@@ -123,43 +153,34 @@ class FundAnalysisService:
                             for field in expense_fields:
                                 if field in fund_ops.index:
                                     val = fund_ops.loc[field]
-                                    # Handle both Series and scalar values
                                     if hasattr(val, 'iloc'):
                                         val = val.iloc[0] if len(val) > 0 else None
                                     elif hasattr(val, 'values'):
                                         val = val.values[0] if len(val.values) > 0 else None
                                     
                                     if val is not None and pd.notna(val):
-                                        expense = float(val)
-                                        # Normalize to decimal format:
-                                        # - If value >= 0.01 (like 0.03, 1.31), it's percentage format -> divide by 100
-                                        # - If value < 0.01 (like 0.0003, 0.0131), it's already decimal
-                                        if expense >= 0.01:
-                                            expense = expense / 100
-                                        logger.info(f"  yfinance fund_ops expense for {symbol}: {expense} ({expense*100:.4f}%)")
+                                        raw = float(val)
+                                        expense = normalize_expense_ratio(raw, f"fund_ops.{field}")
+                                        logger.info(f"  yfinance expense for {symbol}: {expense} ({expense*100:.4f}%)")
                                         return expense, category
                         
-                        # Try as dict if DataFrame doesn't work
                         if isinstance(fund_ops, dict):
                             for field in ['annualReportExpenseRatio', 'totalExpenseRatio', 'netExpenseRatio']:
                                 if field in fund_ops and fund_ops[field]:
-                                    expense = float(fund_ops[field])
-                                    if expense >= 0.01:
-                                        expense = expense / 100
+                                    raw = float(fund_ops[field])
+                                    expense = normalize_expense_ratio(raw, f"fund_ops_dict.{field}")
                                     return expense, category
                                     
                     except Exception as e:
                         logger.debug(f"  fund_operations parsing error for {symbol}: {e}")
                     
-                    # Try fund_overview
                     try:
                         overview = funds_data.fund_overview
                         if overview and isinstance(overview, dict):
                             for field in ['expenseRatio', 'netExpenseRatio', 'annualReportExpenseRatio']:
                                 if field in overview and overview[field]:
-                                    expense = float(overview[field])
-                                    if expense >= 0.01:
-                                        expense = expense / 100
+                                    raw = float(overview[field])
+                                    expense = normalize_expense_ratio(raw, f"fund_overview.{field}")
                                     return expense, category
                     except Exception as e:
                         logger.debug(f"  fund_overview error for {symbol}: {e}")
@@ -177,10 +198,8 @@ class FundAnalysisService:
             
             for field in expense_info_fields:
                 if field in info and info[field] is not None:
-                    expense = float(info[field])
-                    # Normalize: if >= 0.01, it's percentage format
-                    if expense >= 0.01:
-                        expense = expense / 100
+                    raw = float(info[field])
+                    expense = normalize_expense_ratio(raw, f"info.{field}")
                     if expense > 0:
                         logger.info(f"  yfinance info expense for {symbol}: {expense} ({expense*100:.4f}%)")
                         return expense, category
@@ -197,7 +216,8 @@ class FundAnalysisService:
         Search for a fund by symbol and get its details
         Returns fund info including category, expense ratio, etc.
         
-        Uses yfinance for expense ratio (more reliable) and mstarpy for ratings.
+        Uses mstarpy ongoingCharge as PRIMARY source (more reliable/consistent),
+        yfinance as fallback.
         """
         symbol = symbol.upper().strip()
         
@@ -212,12 +232,10 @@ class FundAnalysisService:
         
         logger.info(f"Looking up fund data for {symbol}...")
         
-        # STEP 1: Get expense ratio from yfinance (more reliable)
-        expense_ratio, yf_category = self._get_expense_ratio_yfinance(symbol)
-        
-        # STEP 2: Get ratings and additional info from mstarpy
+        # STEP 1: Get data from mstarpy (PRIMARY source for expense ratio)
         us_exchanges = ["ARCX", "XNAS", "XNYS", "BATS", "NYSE", "NASDAQ"]
         mstar_data = None
+        mstar_expense = 0
         
         for inv_type in ["FE", "FO"]:  # ETF, Mutual Fund
             try:
@@ -242,17 +260,19 @@ class FundAnalysisService:
                         exchange = meta.get("exchange", "") or ""
                         
                         if ticker.upper() == symbol and exchange in us_exchanges:
-                            # Get mstarpy expense ratio as fallback
-                            mstar_expense = self._get_field_value(fields, "ongoingCharge", 0)
-                            if mstar_expense:
-                                mstar_expense = mstar_expense / 100  # Convert to decimal
+                            # Get mstarpy expense ratio (ongoingCharge is in percentage, e.g., 0.03 for 0.03%)
+                            raw_mstar_expense = self._get_field_value(fields, "ongoingCharge", 0)
+                            if raw_mstar_expense:
+                                # mstarpy ongoingCharge is already in percentage format
+                                # 0.03 means 0.03%, so divide by 100 to get decimal
+                                mstar_expense = raw_mstar_expense / 100
+                                logger.info(f"  mstarpy ongoingCharge for {symbol}: {raw_mstar_expense}% -> {mstar_expense} decimal")
                             
                             mstar_data = {
                                 "security_id": meta.get("securityID"),
                                 "name": self._get_field_value(fields, "name", "Unknown"),
                                 "category": self._get_field_value(fields, "morningstarCategory", ""),
                                 "category_id": meta.get("categoryId", ""),
-                                "mstar_expense_ratio": mstar_expense,
                                 "star_rating": int(self._get_field_value(fields, "fundStarRating", 0) or 0),
                                 "medalist_rating": self._get_field_value(fields, "medalistRating", "") or "Unknown",
                                 "return_m12": self._get_field_value(fields, "totalReturn", 0) or 0,
@@ -267,10 +287,15 @@ class FundAnalysisService:
                 logger.warning(f"Error searching mstarpy for {symbol}: {e}")
                 continue
         
-        # STEP 3: Combine data, preferring yfinance expense ratio
+        # STEP 2: Get yfinance data as fallback (for expense ratio and category)
+        yf_expense, yf_category = self._get_expense_ratio_yfinance(symbol)
+        
+        # STEP 3: Combine data
+        # Prefer mstarpy expense ratio (more consistent), fallback to yfinance
+        final_expense = mstar_expense if mstar_expense > 0 else yf_expense
+        logger.info(f"  Final expense ratio for {symbol}: {final_expense} ({final_expense*100:.4f}%) [mstar={mstar_expense}, yf={yf_expense}]")
+        
         if mstar_data:
-            # Use yfinance expense ratio if available, otherwise mstarpy
-            final_expense = expense_ratio if expense_ratio > 0 else mstar_data.get('mstar_expense_ratio', 0)
             
             # Use yfinance category if mstar doesn't have one
             category = mstar_data.get('category') or yf_category or 'Unknown'
@@ -299,7 +324,7 @@ class FundAnalysisService:
                 "name": symbol,
                 "category": yf_category or "Unknown",
                 "category_id": "",
-                "expense_ratio": expense_ratio,
+                "expense_ratio": yf_expense,
                 "star_rating": 0,
                 "medalist_rating": "Unknown",
                 "return_m12": 0,
