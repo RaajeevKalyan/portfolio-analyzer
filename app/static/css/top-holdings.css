@@ -43,6 +43,41 @@
     gap: 0.5rem;
 }
 
+/* Analyze/Refresh button */
+.top-holdings-header-actions .btn-analyze {
+    background: var(--primary-color);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.5rem 1rem;
+    color: white;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+.top-holdings-header-actions .btn-analyze:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+/* Timestamp display */
+.top-holdings-container .analysis-timestamp {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.top-holdings-container .analysis-timestamp i {
+    font-size: 0.7rem;
+}
+
 /* =========================================================================
    Summary Stats
    ========================================================================= */
@@ -153,17 +188,19 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
     color: var(--text-secondary);
     font-size: 0.75rem;
     font-weight: 600;
 }
 
 .rank-badge.top-3 {
-    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    background: var(--primary-color);
+    border-color: var(--primary-color);
     color: white;
 }
 

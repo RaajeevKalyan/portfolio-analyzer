@@ -422,6 +422,13 @@ class MerrillCSVParser(CSVParserBase):
         symbol_raw = row[columns['symbol']]
         symbol = self.normalize_symbol(symbol_raw)
         
+        # SKIP special footer rows (Total, Balances, etc.)
+        symbol_upper = symbol.upper() if symbol else ''
+        skip_symbols = {'TOTAL', 'BALANCES', 'CASH BALANCE', 'PENDING ACTIVITY', 'PENDING'}
+        if symbol_upper in skip_symbols:
+            logger.debug(f"Skipping footer row: {symbol_upper}")
+            return None
+        
         # Extract description for cash detection
         description = ''
         if columns.get('description') and not pd.isna(row[columns['description']]):
@@ -609,6 +616,52 @@ class MerrillCSVParser(CSVParserBase):
                 return True
         
         return False
+    
+    def detect_asset_type(self, symbol: str, description: str) -> str:
+        """
+        Determine the asset type using the shared AssetTypeResolver.
+        
+        This uses the same logic as cache generation:
+        1. Check stock_info_cache
+        2. Fetch from yfinance quoteType
+        3. Fall back to heuristics
+        """
+        try:
+            from app.services.asset_type_resolver import resolve_asset_type
+            return resolve_asset_type(
+                symbol=symbol,
+                description=description,
+                csv_type_field='',  # Merrill doesn't have a type field
+                use_cache=True,
+                use_yfinance=True
+            )
+        except ImportError:
+            # Fallback if resolver not available
+            logger.warning(f"AssetTypeResolver not available, using fallback for {symbol}")
+            return self._detect_asset_type_fallback(symbol, description)
+    
+    def _detect_asset_type_fallback(self, symbol: str, description: str) -> str:
+        """Fallback asset type determination if resolver not available"""
+        symbol_upper = symbol.upper() if symbol else ''
+        desc_lower = description.lower() if description else ''
+        
+        # Check description
+        if 'etf' in desc_lower or 'exchange traded' in desc_lower:
+            return 'etf'
+        if 'fund' in desc_lower:
+            return 'mutual_fund'
+        if 'bond' in desc_lower or 'treasury' in desc_lower:
+            return 'bond'
+        
+        # Symbol patterns
+        common_etfs = {'VOO', 'VTI', 'SPY', 'QQQ', 'IVV', 'VEA', 'VWO', 'BND', 'AGG'}
+        if symbol_upper in common_etfs:
+            return 'etf'
+        
+        if len(symbol_upper) == 5 and symbol_upper.endswith('X'):
+            return 'mutual_fund'
+        
+        return 'stock'
     
     def get_required_columns(self) -> List[str]:
         """Get list of possible required columns"""

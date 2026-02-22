@@ -70,14 +70,14 @@ async function loadTopHoldings(forceRefresh = false) {
         <div class="top-holdings-header">
             <h2><i class="fas fa-layer-group"></i> Top Stock Holdings</h2>
             <div class="top-holdings-header-actions">
-                <button class="btn-refresh-round" onclick="runTopHoldings()" title="Calculate top holdings">
-                    <i class="fas fa-play"></i>
+                <button class="btn-analyze" onclick="runTopHoldings()" title="Calculate top holdings">
+                    <i class="fas fa-calculator"></i> Analyze
                 </button>
             </div>
         </div>
         <div class="top-holdings-placeholder">
             <i class="fas fa-chart-bar"></i>
-            <p>Click <i class="fas fa-play"></i> to calculate top holdings</p>
+            <p>Click <strong>Analyze</strong> to calculate top holdings</p>
             <small>Aggregates direct holdings + stocks held through ETFs/MFs</small>
         </div>
     `;
@@ -142,6 +142,23 @@ async function runTopHoldings() {
 function renderTopHoldings(container, data) {
     const { top_holdings, total_stock_value, total_direct_value, total_indirect_value, total_unique_stocks } = data;
     
+    // Get cache timestamp for display
+    let analysisTimeStr = 'Just now';
+    try {
+        const cached = sessionStorage.getItem(TOP_HOLDINGS_CACHE_KEY);
+        if (cached) {
+            const { timestamp } = JSON.parse(cached);
+            const ageMinutes = Math.floor((Date.now() - timestamp) / 60000);
+            if (ageMinutes < 1) {
+                analysisTimeStr = 'Just now';
+            } else if (ageMinutes < 60) {
+                analysisTimeStr = `${ageMinutes}m ago`;
+            } else {
+                analysisTimeStr = new Date(timestamp).toLocaleTimeString();
+            }
+        }
+    } catch (e) {}
+    
     if (!top_holdings || top_holdings.length === 0) {
         container.innerHTML = `
             <div class="top-holdings-header">
@@ -160,10 +177,13 @@ function renderTopHoldings(container, data) {
         <div class="top-holdings-header">
             <h2><i class="fas fa-layer-group"></i> Top Stock Holdings</h2>
             <div class="top-holdings-header-actions">
-                <button class="btn-refresh-round" onclick="clearTopHoldingsCache(); runTopHoldings();" title="Refresh">
-                    <i class="fas fa-sync-alt"></i>
+                <button class="btn-analyze" onclick="clearTopHoldingsCache(); runTopHoldings();" title="Refresh">
+                    <i class="fas fa-sync-alt"></i> Refresh
                 </button>
             </div>
+        </div>
+        <div class="analysis-timestamp">
+            <i class="fas fa-clock"></i> Last analyzed: ${analysisTimeStr}
         </div>
         
         <div class="top-holdings-summary">

@@ -707,6 +707,20 @@ class FundAnalysisService:
         - peer_navs: Dict of peer security_id -> DataFrame
         - comparison: Summary comparison data
         """
+        import math
+        
+        def safe_float(val, default=0):
+            """Convert to float, handling NaN and None"""
+            if val is None:
+                return default
+            try:
+                f = float(val)
+                if math.isnan(f) or math.isinf(f):
+                    return default
+                return f
+            except (ValueError, TypeError):
+                return default
+        
         result = {
             'fund_nav': None,
             'peer_navs': {},
@@ -714,8 +728,8 @@ class FundAnalysisService:
                 'fund': {
                     'symbol': fund_info.symbol,
                     'name': fund_info.name,
-                    'return_m12': fund_info.return_m12,
-                    'expense_ratio': fund_info.expense_ratio
+                    'return_m12': safe_float(fund_info.return_m12),
+                    'expense_ratio': safe_float(fund_info.expense_ratio)
                 },
                 'peers': []
             }
@@ -735,8 +749,8 @@ class FundAnalysisService:
                 result['comparison']['peers'].append({
                     'symbol': peer.ticker,
                     'name': peer.name,
-                    'return_m12': peer.return_m12,
-                    'expense_ratio': peer.expense_ratio,
+                    'return_m12': safe_float(peer.return_m12),
+                    'expense_ratio': safe_float(peer.expense_ratio),
                     'medalist_rating': peer.medalist_rating
                 })
         

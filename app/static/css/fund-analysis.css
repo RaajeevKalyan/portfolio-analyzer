@@ -18,7 +18,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     flex-wrap: wrap;
     gap: 1rem;
 }
@@ -40,6 +40,60 @@
 .fund-analysis-actions {
     display: flex;
     gap: 0.5rem;
+}
+
+/* Analyze/Refresh button */
+.btn-analyze {
+    background: var(--primary-color);
+    border: 2px solid var(--primary-color);
+    border-radius: var(--radius-md);
+    padding: 0.5rem 1rem;
+    color: white;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+.btn-analyze:hover:not(:disabled) {
+    background: var(--primary-hover, #2563eb);
+    border-color: var(--primary-hover, #2563eb);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-analyze:disabled,
+.btn-analyze.analyzing {
+    background: var(--bg-tertiary, #e5e7eb);
+    border: 2px solid var(--border-color);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Ensure disabled button is visible in dark theme */
+[data-theme="dark"] .btn-analyze:disabled,
+[data-theme="dark"] .btn-analyze.analyzing {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+/* Timestamp display */
+.analysis-timestamp {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.analysis-timestamp i {
+    font-size: 0.7rem;
 }
 
 .btn-refresh {

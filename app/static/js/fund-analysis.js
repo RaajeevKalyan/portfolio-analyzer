@@ -79,13 +79,13 @@ async function loadFundAnalysis(forceRefresh = false) {
         }
     }
     
-    // Show placeholder state with play button (don't auto-run)
+    // Show placeholder state with analyze button (don't auto-run)
     container.innerHTML = `
         <div class="fund-analysis-header">
             <h2><i class="fas fa-coins"></i> Fund Expense Analysis</h2>
             <div class="expense-summary">
-                <button class="btn-refresh-round" onclick="runFundAnalysis()" title="Analyze fund expenses">
-                    <i class="fas fa-play"></i>
+                <button class="btn-analyze" onclick="runFundAnalysis()" title="Analyze fund expenses">
+                    <i class="fas fa-search-dollar"></i> Analyze
                 </button>
                 <div class="expense-stat">
                     <div class="expense-stat-label">Total Annual Fees</div>
@@ -103,7 +103,7 @@ async function loadFundAnalysis(forceRefresh = false) {
         </div>
         <div class="fund-analysis-placeholder">
             <i class="fas fa-search-dollar"></i>
-            <p>Click <i class="fas fa-play"></i> to analyze fund expenses</p>
+            <p>Click <strong>Analyze</strong> to examine fund expenses</p>
             <small>Fetches expense ratios, Morningstar ratings, and peer recommendations</small>
         </div>
     `;
@@ -116,13 +116,13 @@ async function runFundAnalysis() {
     const container = document.getElementById('fundAnalysisContainer');
     if (!container) return;
     
-    // Show loading state
+    // Show loading state with visible disabled button
     container.innerHTML = `
         <div class="fund-analysis-header">
             <h2><i class="fas fa-coins"></i> Fund Expense Analysis</h2>
             <div class="expense-summary">
-                <button class="btn-refresh-round" disabled title="Analyzing...">
-                    <i class="fas fa-spinner fa-spin"></i>
+                <button class="btn-analyze analyzing" disabled title="Analyzing...">
+                    <i class="fas fa-spinner fa-spin"></i> Analyzing...
                 </button>
                 <div class="expense-stat">
                     <div class="expense-stat-label">Total Annual Fees</div>
@@ -185,12 +185,29 @@ function renderFundAnalysis(container, data) {
     // Always show header and summary, even with no funds
     const hasFunds = top_funds && top_funds.length > 0;
     
+    // Get cache timestamp for display
+    let analysisTimeStr = 'Just now';
+    try {
+        const cached = sessionStorage.getItem(FUND_ANALYSIS_CACHE_KEY);
+        if (cached) {
+            const { timestamp } = JSON.parse(cached);
+            const ageMinutes = Math.floor((Date.now() - timestamp) / 60000);
+            if (ageMinutes < 1) {
+                analysisTimeStr = 'Just now';
+            } else if (ageMinutes < 60) {
+                analysisTimeStr = `${ageMinutes}m ago`;
+            } else {
+                analysisTimeStr = new Date(timestamp).toLocaleTimeString();
+            }
+        }
+    } catch (e) {}
+    
     container.innerHTML = `
         <div class="fund-analysis-header">
             <h2><i class="fas fa-coins"></i> Fund Expense Analysis</h2>
             <div class="expense-summary">
-                <button class="btn-refresh-round" onclick="refreshFundAnalysis()" title="Refresh fund analysis">
-                    <i class="fas fa-sync-alt"></i>
+                <button class="btn-analyze" onclick="refreshFundAnalysis()" title="Refresh analysis">
+                    <i class="fas fa-sync-alt"></i> Refresh
                 </button>
                 <div class="expense-stat">
                     <div class="expense-stat-label">Total Annual Fees</div>
@@ -205,6 +222,9 @@ function renderFundAnalysis(container, data) {
                     <div class="expense-stat-value">${hasFunds ? top_funds.length : 0}</div>
                 </div>
             </div>
+        </div>
+        <div class="analysis-timestamp">
+            <i class="fas fa-clock"></i> Last analyzed: ${analysisTimeStr}
         </div>
         
         ${hasFunds ? `

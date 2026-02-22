@@ -480,11 +480,26 @@ class StockInfoService:
                 # Map to geography region
                 geography = self._map_country_to_geography(country)
                 
+                # Get asset type from quote_type
+                asset_type = 'stock'
+                if quote_type == 'ETF':
+                    asset_type = 'etf'
+                elif quote_type == 'MUTUALFUND':
+                    asset_type = 'mutual_fund'
+                elif quote_type == 'BOND':
+                    asset_type = 'bond'
+                
+                # Get name
+                name = info.get('longName') or info.get('shortName') or original_symbol
+                
                 result = {
                     'sector': sector,
                     'industry': industry,
                     'country': country,
-                    'geography': geography
+                    'geography': geography,
+                    'asset_type': asset_type,
+                    'quote_type': quote_type,
+                    'name': name
                 }
                 
                 # Only cache if we got at least some real data
@@ -495,7 +510,7 @@ class StockInfoService:
                         self.cache[normalized] = result
                     self._save_cache()
                     
-                    logger.info(f"✓ Info for {original_symbol}: {sector} / {country} / {geography}")
+                    logger.info(f"✓ Info for {original_symbol} ({name}): {sector} / {country} / {geography} [{asset_type}]")
                     return result
                 else:
                     logger.warning(f"Got incomplete data for {variant}: sector={sector}, country={country}")
