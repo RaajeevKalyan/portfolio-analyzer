@@ -1,59 +1,233 @@
 """
-Top Holdings Routes - Aggregated stock holdings across all portfolios
+Top Holdings Routes - Optimized with SQL Queries
 
-Shows top 10 stocks by total value, combining:
+Shows top stocks by total value, combining:
 1. Direct holdings (stocks you own directly)
-2. Indirect holdings (stocks held through ETFs/MFs, weighted by fund value and stock weight)
+2. Indirect holdings (stocks held through ETFs/MFs)
+
+OPTIMIZATION:
+- Uses direct SQL queries instead of loading all holdings into Python
+- Batch fetches prices via yf.Tickers() for top 50 stocks only
+- Minimizes API calls and memory usage
 """
 from flask import Blueprint, jsonify
 import logging
 from collections import defaultdict
-from app.services.holdings_aggregator import HoldingsAggregator
+from sqlalchemy import func, desc
 from app.database import db_session
-from app.models import Holding, UnderlyingHolding
+from app.models import Holding, PortfolioSnapshot, BrokerAccount
+from app.services.db_utils import get_latest_snapshot_ids
 
 logger = logging.getLogger(__name__)
 
 top_holdings_bp = Blueprint('top_holdings', __name__)
 
 
+def get_top_direct_stocks(session, snapshot_ids, limit=100):
+    """
+    Get top direct stock holdings using SQL aggregation.
+    
+    Returns:
+        List of dicts with symbol, name, total_value, total_quantity, sector, country
+    """
+    if not snapshot_ids:
+        return []
+    
+    # SQL query to aggregate stocks by symbol across all snapshots
+    results = session.query(
+        Holding.symbol,
+        Holding.name,
+        func.sum(Holding.total_value).label('total_value'),
+        func.sum(Holding.quantity).label('total_quantity'),
+        Holding.sector,
+        Holding.country
+    ).filter(
+        Holding.portfolio_snapshot_id.in_(snapshot_ids),
+        Holding.asset_type == 'stock'
+    ).group_by(
+        Holding.symbol
+    ).order_by(
+        desc('total_value')
+    ).limit(limit).all()
+    
+    return [{
+        'symbol': r.symbol,
+        'name': r.name,
+        'total_value': float(r.total_value) if r.total_value else 0,
+        'total_quantity': float(r.total_quantity) if r.total_quantity else 0,
+        'sector': r.sector or '',
+        'country': r.country or ''
+    } for r in results]
+
+
+def get_top_underlying_stocks(session, snapshot_ids, limit=100):
+    """
+    Get top stocks from underlying holdings of ETFs/MFs.
+    
+    The underlying_holdings_json column stores JSON array of holdings.
+    We need to extract and aggregate these.
+    
+    Returns:
+        Dict of symbol -> {name, total_value, sources: [{fund, value, weight}]}
+    """
+    if not snapshot_ids:
+        return {}
+    
+    # Get all ETF/MF holdings with their underlying data
+    funds = session.query(
+        Holding.symbol,
+        Holding.total_value,
+        Holding.underlying_holdings_json
+    ).filter(
+        Holding.portfolio_snapshot_id.in_(snapshot_ids),
+        Holding.asset_type.in_(['etf', 'mutual_fund']),
+        Holding.underlying_holdings_json.isnot(None)
+    ).all()
+    
+    # Aggregate underlying holdings in Python (JSON parsing required)
+    underlying_totals = defaultdict(lambda: {
+        'symbol': '',
+        'name': '',
+        'total_value': 0,
+        'sources': []
+    })
+    
+    import json
+    for fund in funds:
+        fund_symbol = fund.symbol
+        fund_value = float(fund.total_value) if fund.total_value else 0
+        
+        try:
+            underlying_list = json.loads(fund.underlying_holdings_json) if fund.underlying_holdings_json else []
+        except (json.JSONDecodeError, TypeError):
+            continue
+        
+        for uh in underlying_list:
+            symbol = uh.get('symbol', '')
+            if not symbol:
+                continue
+            
+            name = uh.get('name', symbol)
+            value = float(uh.get('value', 0))
+            weight = float(uh.get('weight', 0))
+            
+            if value <= 0:
+                continue
+            
+            data = underlying_totals[symbol]
+            if not data['symbol']:
+                data['symbol'] = symbol
+                data['name'] = name
+            
+            data['total_value'] += value
+            data['sources'].append({
+                'fund': fund_symbol,
+                'value': value,
+                'weight': weight
+            })
+    
+    # Sort by total value and limit
+    sorted_underlying = sorted(
+        underlying_totals.items(),
+        key=lambda x: x[1]['total_value'],
+        reverse=True
+    )[:limit]
+    
+    return dict(sorted_underlying)
+
+
+def batch_fetch_prices(symbols):
+    """
+    Batch fetch current prices for multiple symbols using yf.Tickers.
+    
+    Args:
+        symbols: List of stock symbols
+        
+    Returns:
+        Dict of symbol -> price
+    """
+    if not symbols:
+        return {}
+    
+    prices = {}
+    
+    try:
+        import yfinance as yf
+        
+        # Filter to valid-looking symbols (avoid Morningstar IDs)
+        valid_symbols = [s for s in symbols if s and len(s) <= 5 and s.isalpha()]
+        
+        if not valid_symbols:
+            return {}
+        
+        # Batch fetch - single API call for all symbols
+        tickers_str = " ".join(valid_symbols)
+        logger.info(f"Batch fetching prices for {len(valid_symbols)} symbols")
+        
+        tickers = yf.Tickers(tickers_str)
+        
+        for symbol in valid_symbols:
+            try:
+                ticker = tickers.tickers.get(symbol)
+                if ticker:
+                    info = ticker.info
+                    if info:
+                        price = info.get('currentPrice') or info.get('previousClose') or info.get('regularMarketPrice')
+                        if price and price > 0:
+                            prices[symbol] = float(price)
+            except Exception as e:
+                logger.debug(f"Could not get price for {symbol}: {e}")
+                continue
+        
+        logger.info(f"Got prices for {len(prices)} symbols")
+        
+    except Exception as e:
+        logger.error(f"Batch price fetch error: {e}")
+    
+    return prices
+
+
 @top_holdings_bp.route('/api/top-holdings', methods=['GET'])
 def get_top_holdings():
     """
-    Get top 10 stocks by total value across all portfolios
+    Get top stocks by total value across all portfolios.
     
-    Combines:
-    - Direct stock holdings
-    - Indirect holdings through ETFs/MFs (weighted by fund value × stock weight)
-    
-    Returns:
-        JSON with top holdings and breakdown
+    Optimized flow:
+    1. SQL query for top 100 direct stock holdings
+    2. Extract top 100 underlying holdings from ETF/MF JSON
+    3. Merge and aggregate by symbol
+    4. Sort and take top 50
+    5. Batch fetch prices for symbols needing quantity calculation
     """
     try:
-        # Get aggregated holdings
-        aggregator = HoldingsAggregator()
-        holdings_data = aggregator.get_aggregated_holdings()
-        holdings = holdings_data.get('holdings', [])
-        underlying_holdings_map = holdings_data.get('underlying_holdings', {})
+        with db_session() as session:
+            # Step 1: Get latest snapshot IDs
+            snapshot_ids = get_latest_snapshot_ids(session)
+            
+            if not snapshot_ids:
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'top_holdings': [],
+                        'total_stock_value': 0,
+                        'total_direct_value': 0,
+                        'total_indirect_value': 0,
+                        'total_unique_stocks': 0,
+                        'message': 'No holdings found'
+                    }
+                })
+            
+            logger.info(f"Processing {len(snapshot_ids)} snapshots")
+            
+            # Step 2: Get top direct stocks (SQL aggregation)
+            direct_stocks = get_top_direct_stocks(session, snapshot_ids, limit=100)
+            logger.info(f"Found {len(direct_stocks)} direct stock holdings")
+            
+            # Step 3: Get top underlying stocks
+            underlying_stocks = get_top_underlying_stocks(session, snapshot_ids, limit=100)
+            logger.info(f"Found {len(underlying_stocks)} underlying stock holdings")
         
-        logger.info(f"Top Holdings: {len(holdings)} holdings, {len(underlying_holdings_map)} underlying stocks")
-        
-        # Debug: log some underlying holdings
-        for sym, data in list(underlying_holdings_map.items())[:5]:
-            logger.info(f"  Underlying: {sym} = ${data.get('total_value', 0)} from {len(data.get('sources', []))} funds")
-        
-        if not holdings:
-            return jsonify({
-                'success': True,
-                'data': {
-                    'top_holdings': [],
-                    'total_stock_value': 0,
-                    'message': 'No holdings found'
-                }
-            })
-        
-        # Aggregate stock values
-        # Key: symbol, Value: {name, direct_value, indirect_value, indirect_sources: [{fund, value}]}
+        # Step 4: Merge direct and indirect holdings
         stock_totals = defaultdict(lambda: {
             'symbol': '',
             'name': '',
@@ -65,61 +239,26 @@ def get_top_holdings():
             'country': ''
         })
         
-        # Process direct holdings
-        for holding in holdings:
-            symbol = holding.get('symbol', '')
-            asset_type = holding.get('asset_type', '')
-            value = float(holding.get('total_value', 0))
-            
-            if asset_type == 'stock':
-                # Direct stock holding
+        # Add direct holdings
+        for ds in direct_stocks:
+            symbol = ds['symbol']
+            stock_totals[symbol]['symbol'] = symbol
+            stock_totals[symbol]['name'] = ds['name']
+            stock_totals[symbol]['direct_value'] = ds['total_value']
+            stock_totals[symbol]['direct_shares'] = ds['total_quantity']
+            stock_totals[symbol]['sector'] = ds['sector']
+            stock_totals[symbol]['country'] = ds['country']
+        
+        # Add indirect holdings
+        for symbol, us_data in underlying_stocks.items():
+            if not stock_totals[symbol]['symbol']:
                 stock_totals[symbol]['symbol'] = symbol
-                stock_totals[symbol]['name'] = holding.get('name', symbol)
-                stock_totals[symbol]['direct_value'] += value
-                stock_totals[symbol]['direct_shares'] += float(holding.get('quantity', 0))
-                stock_totals[symbol]['sector'] = holding.get('sector', '')
-                stock_totals[symbol]['country'] = holding.get('country', '')
-        
-        # Process indirect holdings from underlying_holdings_map
-        # This contains all stocks held through ETFs/MFs
-        for uh_symbol, uh_data in underlying_holdings_map.items():
-            uh_value = float(uh_data.get('total_value', 0))
-            uh_name = uh_data.get('name', uh_symbol)
-            uh_sources = uh_data.get('sources', [])
+                stock_totals[symbol]['name'] = us_data['name']
             
-            if uh_value <= 0:
-                continue
-            
-            # Initialize if not already a direct holding
-            if not stock_totals[uh_symbol]['symbol']:
-                stock_totals[uh_symbol]['symbol'] = uh_symbol
-                stock_totals[uh_symbol]['name'] = uh_name
-            
-            stock_totals[uh_symbol]['indirect_value'] += uh_value
-            
-            # Add sources (which funds hold this stock)
-            for source in uh_sources:
-                stock_totals[uh_symbol]['indirect_sources'].append({
-                    'fund': source.get('fund', ''),
-                    'fund_name': source.get('fund', ''),
-                    'weight': float(source.get('weight', 0)),
-                    'value': float(source.get('value', 0))
-                })
+            stock_totals[symbol]['indirect_value'] = us_data['total_value']
+            stock_totals[symbol]['indirect_sources'] = us_data['sources'][:5]  # Top 5 sources
         
-        # Also fetch sector/country for stocks that came from underlying holdings
-        # (they might not have it set)
-        from app.services.stock_info_service import StockInfoService
-        stock_info_service = StockInfoService()
-        
-        for symbol, data in stock_totals.items():
-            if not data['sector'] or data['sector'] == 'Unknown':
-                # Try to get from stock info cache
-                cached_info = stock_info_service.cache.get(symbol, {})
-                if cached_info:
-                    data['sector'] = cached_info.get('sector', '') or ''
-                    data['country'] = cached_info.get('country', '') or ''
-        
-        # Convert to list and calculate totals
+        # Step 5: Build result list and sort
         all_stocks = []
         for symbol, data in stock_totals.items():
             total_value = data['direct_value'] + data['indirect_value']
@@ -131,28 +270,70 @@ def get_top_holdings():
                     'direct_value': round(data['direct_value'], 2),
                     'direct_shares': round(data['direct_shares'], 4),
                     'indirect_value': round(data['indirect_value'], 2),
-                    'indirect_sources': data['indirect_sources'][:5],  # Limit to top 5 sources
+                    'indirect_sources': data['indirect_sources'],
                     'num_funds': len(data['indirect_sources']),
                     'sector': data['sector'],
                     'country': data['country'],
                     'is_also_held': data['direct_value'] > 0 and data['indirect_value'] > 0
                 })
         
-        # Sort by total value and get top 25
         all_stocks.sort(key=lambda x: x['total_value'], reverse=True)
-        top_25 = all_stocks[:25]
+        top_50 = all_stocks[:50]
         
-        # Calculate total stock exposure
+        # Step 6: Batch fetch prices for stocks needing quantity calculation
+        # These are stocks with indirect_value but no direct_shares (can't calculate price)
+        symbols_needing_price = [
+            s['symbol'] for s in top_50 
+            if s['indirect_value'] > 0 and s['direct_shares'] == 0
+        ]
+        
+        prices = {}
+        if symbols_needing_price:
+            prices = batch_fetch_prices(symbols_needing_price)
+        
+        # Step 7: Calculate total shares for each stock
+        for stock in top_50:
+            direct_shares = stock['direct_shares']
+            indirect_shares = 0
+            
+            if stock['indirect_value'] > 0:
+                # Get price from direct holdings or batch fetch
+                if direct_shares > 0 and stock['direct_value'] > 0:
+                    price = stock['direct_value'] / direct_shares
+                else:
+                    price = prices.get(stock['symbol'], 0)
+                
+                if price > 0:
+                    indirect_shares = stock['indirect_value'] / price
+            
+            total_shares = direct_shares + indirect_shares
+            stock['total_shares'] = round(total_shares, 4) if total_shares > 0 else None
+        
+        # Step 8: Get sector/country from cache for indirect-only holdings
+        try:
+            from app.services.stock_info_service import StockInfoService
+            stock_info_service = StockInfoService()
+            
+            for stock in top_50:
+                if not stock['sector']:
+                    cached = stock_info_service.cache.get(stock['symbol'], {})
+                    if cached:
+                        stock['sector'] = cached.get('sector', '') or ''
+                        stock['country'] = cached.get('country', '') or ''
+        except Exception as e:
+            logger.debug(f"Could not load stock info cache: {e}")
+        
+        # Calculate totals
         total_stock_value = sum(s['total_value'] for s in all_stocks)
         total_direct = sum(s['direct_value'] for s in all_stocks)
         total_indirect = sum(s['indirect_value'] for s in all_stocks)
         
-        logger.info(f"Top holdings: {len(all_stocks)} unique stocks, ${total_stock_value:.2f} total (${total_direct:.2f} direct, ${total_indirect:.2f} via funds)")
+        logger.info(f"Top holdings: {len(all_stocks)} unique stocks, ${total_stock_value:.2f} total")
         
         return jsonify({
             'success': True,
             'data': {
-                'top_holdings': top_25,
+                'top_holdings': top_50[:25],  # Return top 25 for display
                 'total_stock_value': round(total_stock_value, 2),
                 'total_direct_value': round(total_direct, 2),
                 'total_indirect_value': round(total_indirect, 2),

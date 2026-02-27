@@ -119,25 +119,41 @@ def register_routes(app):
                            'ally', 'etrade', 'wellsfargo']
             
             with db_session() as session:
-                # Get all broker accounts from DB
-                db_brokers = session.query(BrokerAccount).all()
+                # OPTIMIZED: Single query to get all brokers with their latest snapshots
+                from sqlalchemy import func
+                from sqlalchemy.orm import joinedload
                 
-                # Create a map of broker_name -> BrokerAccount
-                broker_map = {b.broker_name: b for b in db_brokers}
+                # Subquery: get max snapshot date per broker
+                latest_date_subq = session.query(
+                    PortfolioSnapshot.broker_account_id,
+                    func.max(PortfolioSnapshot.snapshot_date).label('max_date')
+                ).group_by(PortfolioSnapshot.broker_account_id).subquery()
+                
+                # Get all brokers with their latest snapshot (if any) in ONE query
+                brokers_with_snapshots = session.query(
+                    BrokerAccount,
+                    PortfolioSnapshot
+                ).outerjoin(
+                    latest_date_subq,
+                    BrokerAccount.id == latest_date_subq.c.broker_account_id
+                ).outerjoin(
+                    PortfolioSnapshot,
+                    (PortfolioSnapshot.broker_account_id == BrokerAccount.id) &
+                    (PortfolioSnapshot.snapshot_date == latest_date_subq.c.max_date)
+                ).all()
+                
+                # Create map of broker_name -> (BrokerAccount, PortfolioSnapshot)
+                broker_map = {b.broker_name: (b, s) for b, s in brokers_with_snapshots}
                 
                 brokers_data = []
                 total_net_worth = 0
                 
                 # Show all brokers, whether they have data or not
                 for broker_name in ALL_BROKERS:
-                    broker = broker_map.get(broker_name)
+                    broker_data = broker_map.get(broker_name)
                     
-                    if broker:
-                        # Get latest snapshot for this broker
-                        latest_snapshot = session.query(PortfolioSnapshot)\
-                            .filter(PortfolioSnapshot.broker_account_id == broker.id)\
-                            .order_by(PortfolioSnapshot.snapshot_date.desc())\
-                            .first()
+                    if broker_data:
+                        broker, latest_snapshot = broker_data
                         
                         if latest_snapshot:
                             total_net_worth += float(latest_snapshot.total_value)

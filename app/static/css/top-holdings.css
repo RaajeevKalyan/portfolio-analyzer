@@ -46,7 +46,7 @@
 /* Analyze/Refresh button */
 .top-holdings-header-actions .btn-analyze {
     background: var(--primary-color);
-    border: none;
+    border: 2px solid var(--primary-color);
     border-radius: var(--radius-md);
     padding: 0.5rem 1rem;
     color: white;
@@ -59,9 +59,19 @@
     font-size: 0.85rem;
 }
 
-.top-holdings-header-actions .btn-analyze:hover {
-    background: var(--primary-hover);
+.top-holdings-header-actions .btn-analyze:hover:not(:disabled) {
+    background: var(--primary-hover, #2563eb);
+    border-color: var(--primary-hover, #2563eb);
+    color: white;
     transform: translateY(-1px);
+}
+
+.top-holdings-header-actions .btn-analyze:disabled {
+    background: var(--bg-tertiary, #e5e7eb);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+    transform: none;
 }
 
 /* Timestamp display */

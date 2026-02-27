@@ -142,20 +142,13 @@ async function runTopHoldings() {
 function renderTopHoldings(container, data) {
     const { top_holdings, total_stock_value, total_direct_value, total_indirect_value, total_unique_stocks } = data;
     
-    // Get cache timestamp for display
-    let analysisTimeStr = 'Just now';
+    // Get cache timestamp for display - show actual time, not relative
+    let analysisTimeStr = new Date().toLocaleTimeString();
     try {
         const cached = sessionStorage.getItem(TOP_HOLDINGS_CACHE_KEY);
         if (cached) {
             const { timestamp } = JSON.parse(cached);
-            const ageMinutes = Math.floor((Date.now() - timestamp) / 60000);
-            if (ageMinutes < 1) {
-                analysisTimeStr = 'Just now';
-            } else if (ageMinutes < 60) {
-                analysisTimeStr = `${ageMinutes}m ago`;
-            } else {
-                analysisTimeStr = new Date(timestamp).toLocaleTimeString();
-            }
+            analysisTimeStr = new Date(timestamp).toLocaleTimeString();
         }
     } catch (e) {}
     
@@ -211,6 +204,7 @@ function renderTopHoldings(container, data) {
                     <th style="width: 40px;">#</th>
                     <th>Stock</th>
                     <th>Sector</th>
+                    <th>Qty</th>
                     <th>Total Value</th>
                     <th>Direct</th>
                     <th>Via Funds</th>
@@ -297,6 +291,9 @@ function renderTopHoldingRow(holding, index) {
             </td>
             <td>
                 ${holding.sector ? `<span class="sector-badge">${holding.sector}</span>` : '<span class="sector-badge">—</span>'}
+            </td>
+            <td>
+                <span class="quantity-value">${holding.total_shares ? formatNumber(holding.total_shares, 2) : '—'}</span>
             </td>
             <td>
                 <div class="value-breakdown">

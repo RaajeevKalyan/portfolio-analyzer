@@ -185,20 +185,13 @@ function renderFundAnalysis(container, data) {
     // Always show header and summary, even with no funds
     const hasFunds = top_funds && top_funds.length > 0;
     
-    // Get cache timestamp for display
-    let analysisTimeStr = 'Just now';
+    // Get cache timestamp - show actual time, not relative
+    let analysisTimeStr = new Date().toLocaleTimeString();
     try {
         const cached = sessionStorage.getItem(FUND_ANALYSIS_CACHE_KEY);
         if (cached) {
             const { timestamp } = JSON.parse(cached);
-            const ageMinutes = Math.floor((Date.now() - timestamp) / 60000);
-            if (ageMinutes < 1) {
-                analysisTimeStr = 'Just now';
-            } else if (ageMinutes < 60) {
-                analysisTimeStr = `${ageMinutes}m ago`;
-            } else {
-                analysisTimeStr = new Date(timestamp).toLocaleTimeString();
-            }
+            analysisTimeStr = new Date(timestamp).toLocaleTimeString();
         }
     } catch (e) {}
     

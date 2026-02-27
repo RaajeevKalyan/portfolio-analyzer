@@ -82,21 +82,9 @@ class HoldingsAggregator:
             }
     
     def _get_latest_snapshots(self, session) -> List[PortfolioSnapshot]:
-        """Get the most recent snapshot for each active broker"""
-        from sqlalchemy import desc
-        
-        latest_snapshots = []
-        accounts = session.query(BrokerAccount).filter_by(is_active=True).all()
-        
-        for account in accounts:
-            snapshot = session.query(PortfolioSnapshot).filter_by(
-                broker_account_id=account.id
-            ).order_by(desc(PortfolioSnapshot.snapshot_date)).first()
-            
-            if snapshot:
-                latest_snapshots.append(snapshot)
-        
-        return latest_snapshots
+        """Get the most recent snapshot for each active broker - OPTIMIZED"""
+        from app.services.db_utils import get_latest_snapshots
+        return get_latest_snapshots(session)
     
     def _aggregate_by_symbol(self, session, snapshots: List[PortfolioSnapshot]) -> List[Dict]:
         """Aggregate holdings by symbol across all snapshots"""

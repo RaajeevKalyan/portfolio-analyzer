@@ -105,30 +105,38 @@ class FundAnalysisService:
                 """
                 Normalize expense ratio to decimal format.
                 
-                yfinance returns values in two formats:
-                1. Decimal format: 0.0131 means 1.31% (most common for mutual funds)
-                2. Percentage format: 1.31 means 1.31% (less common)
+                yfinance returns values inconsistently:
+                1. Some ETFs: 0.0003 meaning 0.03% (decimal format)
+                2. Some funds: 0.03 meaning 0.03% (percentage format, needs /100)
+                3. Some funds: 1.31 meaning 1.31% (percentage format, needs /100)
                 
-                Detection: Real expense ratios are 0.01% to 3%
+                Key insight: Real expense ratios range from 0.01% to 3.0%
                 - In decimal: 0.0001 to 0.03
                 - In percentage: 0.01 to 3.0
                 
-                Threshold: If value > 0.05, it's definitely percentage format
-                (because 0.05 as decimal = 5%, which is unrealistically high)
+                Strategy:
+                - If value >= 0.01 (1% or 0.01 depending on format), assume percentage
+                - If value < 0.01, it's definitely decimal format
+                
+                This means:
+                - 0.0003 -> 0.0003 (kept, 0.03%)
+                - 0.03 -> 0.0003 (÷100, was 0.03% in percentage form)
+                - 1.31 -> 0.0131 (÷100, was 1.31% in percentage form)
                 """
                 if raw_value <= 0:
                     return 0
                 
                 logger.info(f"    {symbol} [{source}]: raw = {raw_value}")
                 
-                # If > 0.05, it must be percentage format (no fund has 5%+ expense ratio)
-                if raw_value > 0.05:
+                # If >= 0.01, treat as percentage and divide by 100
+                # This handles: 0.03 (0.03%), 0.50 (0.50%), 1.31 (1.31%)
+                if raw_value >= 0.01:
                     result = raw_value / 100
                     logger.info(f"    {symbol}: {raw_value} -> {result} (÷100, was percentage format)")
                     return result
                 else:
-                    # Value <= 0.05: already in decimal format
-                    # Examples: 0.0131 = 1.31%, 0.0003 = 0.03%, 0.03 = 3%
+                    # Value < 0.01: already in decimal format
+                    # Examples: 0.0003 = 0.03%, 0.005 = 0.5%
                     logger.info(f"    {symbol}: {raw_value} -> {raw_value} (kept, already decimal)")
                     return raw_value
             

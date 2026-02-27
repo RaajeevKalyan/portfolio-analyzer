@@ -318,7 +318,37 @@ function checkResolutionProgress() {
    Initialization
    ========================================================================= */
 
+/**
+ * Apply broker visibility settings from localStorage
+ * Hides broker cards that user has disabled in settings
+ */
+function applyBrokerVisibility() {
+    const visibility = getStoredValue('broker_visibility', {});
+    
+    document.querySelectorAll('.broker-card').forEach(card => {
+        const broker = card.getAttribute('data-broker');
+        if (broker) {
+            const isVisible = visibility[broker.toLowerCase()] !== false;
+            card.style.display = isVisible ? '' : 'none';
+        }
+    });
+    
+    // Also update the summary cards in the header if they exist
+    document.querySelectorAll('[data-broker-summary]').forEach(el => {
+        const broker = el.getAttribute('data-broker-summary');
+        if (broker) {
+            const isVisible = visibility[broker.toLowerCase()] !== false;
+            el.style.display = isVisible ? '' : 'none';
+        }
+    });
+    
+    console.log('Applied broker visibility:', visibility);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Apply broker visibility first
+    applyBrokerVisibility();
+    
     // Initialize broker charts if Chart.js is loaded
     if (typeof Chart !== 'undefined') {
         const pageData = getPageData();
