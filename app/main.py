@@ -78,6 +78,18 @@ def create_app():
 
 def setup_logging(app):
     """Configure application logging"""
+    # Configure root logger to ensure all module logs are visible
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s [%(name)s]: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Also set specific loggers to INFO
+    logging.getLogger('app').setLevel(logging.INFO)
+    logging.getLogger('app.services').setLevel(logging.INFO)
+    logging.getLogger('app.routes').setLevel(logging.INFO)
+    
     if not app.debug:
         # File handler
         file_handler = RotatingFileHandler(

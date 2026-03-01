@@ -123,14 +123,16 @@ async function runTopHoldings() {
         container.innerHTML = `
             <div class="top-holdings-header">
                 <h2><i class="fas fa-layer-group"></i> Top Stock Holdings</h2>
+                <div class="top-holdings-header-actions">
+                    <button class="btn-analyze" onclick="clearTopHoldingsCache(); runTopHoldings();" title="Retry">
+                        <i class="fas fa-sync-alt"></i> Retry
+                    </button>
+                </div>
             </div>
             <div class="top-holdings-empty">
                 <i class="fas fa-exclamation-circle"></i>
                 <p>Error loading top holdings</p>
                 <small>${error.message}</small>
-                <button class="btn-refresh" onclick="runTopHoldings()" style="margin-top: 1rem;">
-                    <i class="fas fa-sync-alt"></i> Retry
-                </button>
             </div>
         `;
     }
@@ -156,6 +158,11 @@ function renderTopHoldings(container, data) {
         container.innerHTML = `
             <div class="top-holdings-header">
                 <h2><i class="fas fa-layer-group"></i> Top Stock Holdings</h2>
+                <div class="top-holdings-header-actions">
+                    <button class="btn-analyze" onclick="clearTopHoldingsCache(); runTopHoldings();" title="Refresh">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
             </div>
             <div class="top-holdings-empty">
                 <i class="fas fa-chart-bar"></i>

@@ -96,10 +96,12 @@ class FundAnalysisService:
               - Mutual funds often return percentage (1.31 for 1.31%)
               We detect based on realistic expense ratio ranges.
         """
+        logger.info(f"  [yfinance] Fetching expense ratio for {symbol}...")
         try:
             ticker = yf.Ticker(symbol)
             info = ticker.info or {}
             category = info.get('category', '')
+            logger.info(f"  [yfinance] {symbol} category: {category}")
             
             def normalize_expense_ratio(raw_value: float, source: str) -> float:
                 """
@@ -246,6 +248,7 @@ class FundAnalysisService:
         
         for inv_type in ["FE", "FO"]:  # ETF, Mutual Fund
             try:
+                logger.info(f"  [mstarpy] Searching for {symbol} as {inv_type}...")
                 results = ms.screener_universe(
                     symbol,
                     language="en-gb",
@@ -258,6 +261,8 @@ class FundAnalysisService:
                     pageSize=50
                 )
                 
+                logger.info(f"  [mstarpy] Found {len(results) if results else 0} results for {symbol}")
+                
                 if results:
                     for result in results:
                         meta = result.get("meta", {})
@@ -267,13 +272,14 @@ class FundAnalysisService:
                         exchange = meta.get("exchange", "") or ""
                         
                         if ticker.upper() == symbol and exchange in us_exchanges:
+                            logger.info(f"  [mstarpy] MATCH: {ticker} on {exchange}")
                             # Get mstarpy expense ratio (ongoingCharge)
                             # mstarpy ongoingCharge can be:
                             # - 0.03 meaning 0.03% (common for ETFs like VOO)
                             # - 3.0 meaning 3% (if returned in raw percentage)
                             raw_mstar_expense = self._get_field_value(fields, "ongoingCharge", 0)
                             if raw_mstar_expense:
-                                logger.info(f"  mstarpy raw ongoingCharge for {symbol}: {raw_mstar_expense}")
+                                logger.info(f"  [mstarpy] ongoingCharge for {symbol}: {raw_mstar_expense}")
                                 
                                 # Normalize: if value >= 1, it's already percentage form (e.g., 3.0 = 3%)
                                 # If value < 1, it could be either:
@@ -286,7 +292,10 @@ class FundAnalysisService:
                                 # Strategy: assume values are in percentage format (0.03 = 0.03%)
                                 # Only divide by 100 to convert to decimal
                                 mstar_expense = raw_mstar_expense / 100
-                                logger.info(f"  mstarpy expense for {symbol}: {raw_mstar_expense}% -> {mstar_expense} decimal")
+                                logger.info(f"  [mstarpy] expense for {symbol}: {raw_mstar_expense}% -> {mstar_expense} decimal")
+                            else:
+                                logger.warning(f"  [mstarpy] NO ongoingCharge field for {symbol}!")
+                                logger.info(f"  [mstarpy] Available fields: {list(fields.keys())}")
                             
                             mstar_data = {
                                 "security_id": meta.get("securityID"),
@@ -304,8 +313,14 @@ class FundAnalysisService:
                     if mstar_data:
                         break
             except Exception as e:
-                logger.warning(f"Error searching mstarpy for {symbol}: {e}")
+                logger.warning(f"[mstarpy] Error searching for {symbol}: {e}")
                 continue
+        
+        # Log mstarpy result
+        if mstar_data:
+            logger.info(f"  [mstarpy] SUCCESS for {symbol}: expense={mstar_expense}")
+        else:
+            logger.warning(f"  [mstarpy] FAILED for {symbol}: no matching fund found")
         
         # STEP 2: Get yfinance data as fallback (for expense ratio and category)
         yf_expense, yf_category = self._get_expense_ratio_yfinance(symbol)
