@@ -84,13 +84,12 @@ class RiskAggregator:
 
     def _calculate_concentration(self, holdings: List[Holding], total_value: float) -> List[Dict]:
         """
-        Calculate concentration - ONLY return stocks exceeding threshold
-        Includes both direct holdings and underlying holdings from ETFs/MFs
-        Excludes cash holdings
-        """
-        # Get threshold from somewhere (default 20%)
-        threshold = 20.0  # TODO: Make this configurable
+        Calculate concentration - return TOP stocks by allocation
         
+        Returns top 10 stocks by value so client can filter by threshold.
+        Includes both direct holdings and underlying holdings from ETFs/MFs.
+        Excludes cash holdings.
+        """
         symbol_totals = defaultdict(lambda: {
             'symbol': '',
             'name': '',
@@ -126,18 +125,17 @@ class RiskAggregator:
         for data in symbol_totals.values():
             data['allocation_pct'] = (data['value'] / total_value * 100) if total_value > 0 else 0
         
-        # FILTER: Only stocks EXCEEDING threshold
-        high_concentration = [
-            data for data in symbol_totals.values()
-            if data['allocation_pct'] > threshold
-        ]
+        # Return TOP 10 stocks by allocation (client will filter by threshold)
+        all_stocks = list(symbol_totals.values())
+        all_stocks.sort(key=lambda x: x['allocation_pct'], reverse=True)
         
-        # Sort by allocation descending
-        high_concentration.sort(key=lambda x: x['allocation_pct'], reverse=True)
+        top_stocks = all_stocks[:10]
         
-        logger.info(f"Found {len(high_concentration)} stocks exceeding {threshold}% threshold")
+        logger.info(f"Returning top {len(top_stocks)} stocks for concentration analysis")
+        if top_stocks:
+            logger.info(f"  Top stock: {top_stocks[0]['symbol']} at {top_stocks[0]['allocation_pct']:.1f}%")
         
-        return high_concentration    
+        return top_stocks    
 
     def _calculate_sector_breakdown(self, holdings: List[Holding], total_value: float) -> Dict[str, float]:
         """

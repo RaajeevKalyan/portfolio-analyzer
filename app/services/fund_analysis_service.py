@@ -105,34 +105,38 @@ class FundAnalysisService:
                 """
                 Normalize expense ratio to decimal format.
                 
-                yfinance MOSTLY returns values in decimal format:
-                - 0.0003 = 0.03%
-                - 0.0106 = 1.06%
-                - 0.0131 = 1.31%
+                yfinance behavior varies by API method:
+                - info dict: Usually decimal (0.0003 = 0.03%)
+                - funds_data: Can be percentage (0.03 = 0.03%) or decimal
                 
-                But sometimes returns percentage format (rare):
-                - 1.06 meaning 1.06% (needs /100)
+                Real expense ratios range from 0.01% to 3%:
+                - In decimal: 0.0001 to 0.03
+                - In percentage: 0.01 to 3.0
                 
-                Strategy:
-                - If value > 0.1 (would mean >10% expense ratio), it's percentage format
-                - Otherwise, assume decimal format (correct as-is)
+                Strategy based on realistic ranges:
+                - If value > 1.0: definitely percentage (e.g., 1.06 = 1.06%), divide by 100
+                - If value >= 0.05: likely percentage (e.g., 0.5 = 0.5%), divide by 100
+                - If value < 0.05: could be either, but assume decimal for safety
+                  (0.03 as decimal = 3%, which is high but possible for some MFs)
+                  (0.0003 as decimal = 0.03%, which is correct for VOO)
                 
-                No real fund has >10% expense ratio, so any value > 0.1 must be percentage.
+                Note: This is imperfect - 0.03 could mean 0.03% or 3%.
+                We rely on mstarpy as primary source which is more consistent.
                 """
                 if raw_value <= 0:
                     return 0
                 
                 logger.info(f"    {symbol} [{source}]: raw = {raw_value}")
                 
-                # If > 0.1, it's definitely percentage format (no fund has >10% ER)
-                if raw_value > 0.1:
+                # Clear percentage format: >= 0.05 or > 1.0
+                if raw_value >= 0.05:
                     result = raw_value / 100
                     logger.info(f"    {symbol}: {raw_value} -> {result} (÷100, was percentage format)")
                     return result
                 else:
-                    # Value <= 0.1: already in decimal format
-                    # Examples: 0.0003 = 0.03%, 0.0106 = 1.06%, 0.03 = 3%
-                    logger.info(f"    {symbol}: {raw_value} -> {raw_value} (kept, already decimal)")
+                    # Value < 0.05: likely already decimal
+                    # 0.0003 = 0.03%, 0.03 = 3%
+                    logger.info(f"    {symbol}: {raw_value} -> {raw_value} (kept, assumed decimal)")
                     return raw_value
             
             # Method 1: Try funds_data (newer yfinance API)
@@ -263,13 +267,26 @@ class FundAnalysisService:
                         exchange = meta.get("exchange", "") or ""
                         
                         if ticker.upper() == symbol and exchange in us_exchanges:
-                            # Get mstarpy expense ratio (ongoingCharge is in percentage, e.g., 0.03 for 0.03%)
+                            # Get mstarpy expense ratio (ongoingCharge)
+                            # mstarpy ongoingCharge can be:
+                            # - 0.03 meaning 0.03% (common for ETFs like VOO)
+                            # - 3.0 meaning 3% (if returned in raw percentage)
                             raw_mstar_expense = self._get_field_value(fields, "ongoingCharge", 0)
                             if raw_mstar_expense:
-                                # mstarpy ongoingCharge is already in percentage format
-                                # 0.03 means 0.03%, so divide by 100 to get decimal
+                                logger.info(f"  mstarpy raw ongoingCharge for {symbol}: {raw_mstar_expense}")
+                                
+                                # Normalize: if value >= 1, it's already percentage form (e.g., 3.0 = 3%)
+                                # If value < 1, it could be either:
+                                #   - 0.03 meaning 0.03% (percentage form)
+                                #   - 0.03 meaning 3% (decimal form, needs no change)
+                                # 
+                                # Key insight: VOO has ER of 0.03%, so if we see 0.03, it's percentage
+                                # No ETF has 0.03 decimal ER (that would be 3%)
+                                #
+                                # Strategy: assume values are in percentage format (0.03 = 0.03%)
+                                # Only divide by 100 to convert to decimal
                                 mstar_expense = raw_mstar_expense / 100
-                                logger.info(f"  mstarpy ongoingCharge for {symbol}: {raw_mstar_expense}% -> {mstar_expense} decimal")
+                                logger.info(f"  mstarpy expense for {symbol}: {raw_mstar_expense}% -> {mstar_expense} decimal")
                             
                             mstar_data = {
                                 "security_id": meta.get("securityID"),
@@ -296,6 +313,22 @@ class FundAnalysisService:
         # STEP 3: Combine data
         # Prefer mstarpy expense ratio (more consistent), fallback to yfinance
         final_expense = mstar_expense if mstar_expense > 0 else yf_expense
+        
+        # SANITY CHECK: Known low-cost Vanguard/iShares ETFs
+        # These should NEVER have expense ratios > 0.5%
+        LOW_COST_ETFS = {'VOO', 'VTI', 'VUG', 'VTV', 'VEA', 'VWO', 'BND', 'VXUS',
+                        'IVV', 'SPY', 'QQQ', 'IWM', 'IWF', 'IWD', 'AGG', 'LQD'}
+        
+        if symbol in LOW_COST_ETFS and final_expense > 0.005:  # > 0.5%
+            logger.warning(f"  SANITY CHECK FAILED for {symbol}: expense {final_expense} ({final_expense*100:.2f}%) is too high!")
+            logger.warning(f"  This is a known low-cost ETF. Expense should be < 0.5%.")
+            logger.warning(f"  mstar_expense={mstar_expense}, yf_expense={yf_expense}")
+            # If we got a clearly wrong value, try to fix it
+            if final_expense > 0.01:  # > 1%, definitely wrong for these ETFs
+                # Assume the value was in percentage form and we didn't convert
+                final_expense = final_expense / 100
+                logger.warning(f"  Corrected expense to: {final_expense} ({final_expense*100:.4f}%)")
+        
         logger.info(f"  Final expense ratio for {symbol}: {final_expense} ({final_expense*100:.4f}%) [mstar={mstar_expense}, yf={yf_expense}]")
         
         if mstar_data:

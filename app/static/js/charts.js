@@ -28,8 +28,13 @@ function refreshCharts() {
     // Fetch fresh data and re-render
     fetch('/api/risk-metrics')
         .then(response => response.json())
-        .then(data => {
-            initCharts(data);
+        .then(result => {
+            // API returns {success: true, data: {...}}
+            if (result.success && result.data) {
+                initCharts(result.data);
+            } else {
+                console.error('Risk metrics API error:', result.error || 'Unknown error');
+            }
         })
         .catch(error => {
             console.error('Error fetching risk metrics:', error);
@@ -237,7 +242,7 @@ function createConcentrationChart(concentration) {
     
     if (!container) return;
     
-    // Get threshold
+    // Get threshold from settings
     const threshold = SettingsManager ? SettingsManager.getThresholds().concentration : 20;
     
     // Check if we have any holdings data at all
@@ -258,7 +263,10 @@ function createConcentrationChart(concentration) {
         return;
     }
     
-    if (!concentration || concentration.length === 0) {
+    // Filter stocks that exceed the threshold (client-side filtering)
+    const highConcentration = (concentration || []).filter(item => item.allocation_pct > threshold);
+    
+    if (highConcentration.length === 0) {
         // Data exists but no concentration issues - this is good!
         container.innerHTML = `
             <div class="success-state">
@@ -275,14 +283,14 @@ function createConcentrationChart(concentration) {
         <div class="concentration-warning">
             <i class="fas fa-exclamation-triangle"></i>
             <div class="concentration-warning-text">
-                ${concentration.length} stock${concentration.length > 1 ? 's' : ''} exceed${concentration.length === 1 ? 's' : ''} 
+                ${highConcentration.length} stock${highConcentration.length > 1 ? 's' : ''} exceed${highConcentration.length === 1 ? 's' : ''} 
                 the ${threshold}% concentration threshold
             </div>
         </div>
         <div class="concentration-list">
     `;
     
-    concentration.forEach(item => {
+    highConcentration.forEach(item => {
         const pct = item.allocation_pct.toFixed(1);
         html += `
             <div class="concentration-item">
