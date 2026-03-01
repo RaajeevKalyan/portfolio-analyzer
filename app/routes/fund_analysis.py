@@ -192,13 +192,21 @@ def compare_fund_with_peers(symbol):
     Returns:
         JSON with fund and peer performance data
     """
+    import time
+    request_start = time.time()
+    
     try:
         days = int(request.args.get('days', 365))
+        
+        logger.info(f"[COMPARE] Starting comparison for {symbol}, days={days}")
         
         analyzer = FundAnalysisService()
         
         # Get fund info
+        logger.info(f"[COMPARE] Searching for fund {symbol}...")
+        fund_search_start = time.time()
         fund_data = analyzer._search_fund(symbol.upper())
+        logger.info(f"[COMPARE] Fund search took {time.time() - fund_search_start:.1f}s")
         
         if not fund_data:
             return jsonify({
@@ -206,19 +214,26 @@ def compare_fund_with_peers(symbol):
                 'error': f'Fund not found: {symbol}'
             }), 404
         
-        # Get peers in same category - use category name even if category_id is empty
+        logger.info(f"[COMPARE] Fund {symbol}: category='{fund_data.get('category')}', security_id={fund_data.get('security_id')}")
+        
+        # Get peers in same category
         peers = []
         category_name = fund_data.get('category', '')
         if category_name and category_name != 'Unknown':
+            peer_search_start = time.time()
             peers = analyzer.find_category_peers(
                 category_id=fund_data.get('category_id', ''),
                 category_name=category_name,
                 exclude_symbols=[symbol.upper()],
                 min_rating='Silver'
             )
-            logger.info(f"Found {len(peers)} peers for {symbol} in category '{category_name}'")
+            logger.info(f"[COMPARE] Found {len(peers)} peers in {time.time() - peer_search_start:.1f}s")
+        else:
+            logger.warning(f"[COMPARE] No category for {symbol}, skipping peer search")
         
         # Get NAV history for fund
+        logger.info(f"[COMPARE] Fetching NAV history for {symbol}...")
+        nav_start = time.time()
         fund_nav = []
         if fund_data.get('security_id') or symbol:
             nav_df = analyzer.get_fund_nav_history(
@@ -233,10 +248,13 @@ def compare_fund_with_peers(symbol):
                         'nav': float(row.get('nav', 0)),
                         'total_return': float(row.get('totalReturn', 0))
                     })
+        logger.info(f"[COMPARE] Fund NAV: {len(fund_nav)} records in {time.time() - nav_start:.1f}s")
         
         # Get NAV history for top 3 peers
         peer_navs = {}
-        for peer in peers[:3]:
+        for i, peer in enumerate(peers[:3]):
+            logger.info(f"[COMPARE] Fetching NAV for peer {i+1}/3: {peer.ticker}...")
+            peer_nav_start = time.time()
             nav_df = analyzer.get_fund_nav_history(
                 peer.security_id if peer.security_id else '', 
                 days,
@@ -251,7 +269,12 @@ def compare_fund_with_peers(symbol):
                     }
                     for _, row in nav_df.iterrows()
                 ]
-                logger.info(f"Got {len(peer_navs[peer.ticker])} NAV records for peer {peer.ticker}")
+                logger.info(f"[COMPARE] Peer {peer.ticker}: {len(peer_navs[peer.ticker])} records in {time.time() - peer_nav_start:.1f}s")
+            else:
+                logger.warning(f"[COMPARE] Peer {peer.ticker}: NO NAV data in {time.time() - peer_nav_start:.1f}s")
+        
+        total_time = time.time() - request_start
+        logger.info(f"[COMPARE] COMPLETE for {symbol}: fund_nav={len(fund_nav)}, peers_with_nav={len(peer_navs)}, total_time={total_time:.1f}s")
         
         return jsonify({
             'success': True,

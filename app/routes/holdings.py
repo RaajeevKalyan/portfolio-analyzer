@@ -272,3 +272,40 @@ def api_holdings_summary():
     except Exception as e:
         logger.error(f"Error getting holdings summary: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+
+@holdings_bp.route('/api/risk-metrics', methods=['GET'])
+def get_risk_metrics():
+    """
+    Get portfolio risk metrics including sector/geography breakdown
+    
+    Returns:
+        JSON: {
+            'success': bool,
+            'data': {
+                'concentration': [...],   # Top holdings
+                'sectors': {...},         # Sector breakdown
+                'geography': {...},       # Geographic breakdown  
+                'overall_risk': str,      # 'low'|'medium'|'high'
+                'total_value': float,
+                'cash_value': float
+            }
+        }
+    """
+    try:
+        from app.services.risk_aggregator import RiskAggregator
+        
+        aggregator = RiskAggregator()
+        metrics = aggregator.get_portfolio_risk_metrics()
+        
+        return jsonify({
+            'success': True,
+            'data': metrics
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting risk metrics: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

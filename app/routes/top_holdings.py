@@ -64,7 +64,7 @@ def get_top_underlying_stocks(session, snapshot_ids, limit=100):
     """
     Get top stocks from underlying holdings of ETFs/MFs.
     
-    The underlying_holdings_json column stores JSON array of holdings.
+    The underlying_holdings_list property returns parsed JSON array of holdings.
     We need to extract and aggregate these.
     
     Returns:
@@ -74,17 +74,12 @@ def get_top_underlying_stocks(session, snapshot_ids, limit=100):
         return {}
     
     # Get all ETF/MF holdings with their underlying data
-    funds = session.query(
-        Holding.symbol,
-        Holding.total_value,
-        Holding.underlying_holdings_json
-    ).filter(
+    funds = session.query(Holding).filter(
         Holding.portfolio_snapshot_id.in_(snapshot_ids),
-        Holding.asset_type.in_(['etf', 'mutual_fund']),
-        Holding.underlying_holdings_json.isnot(None)
+        Holding.asset_type.in_(['etf', 'mutual_fund'])
     ).all()
     
-    # Aggregate underlying holdings in Python (JSON parsing required)
+    # Aggregate underlying holdings in Python (JSON parsing via property)
     underlying_totals = defaultdict(lambda: {
         'symbol': '',
         'name': '',
@@ -92,15 +87,12 @@ def get_top_underlying_stocks(session, snapshot_ids, limit=100):
         'sources': []
     })
     
-    import json
     for fund in funds:
         fund_symbol = fund.symbol
         fund_value = float(fund.total_value) if fund.total_value else 0
         
-        try:
-            underlying_list = json.loads(fund.underlying_holdings_json) if fund.underlying_holdings_json else []
-        except (json.JSONDecodeError, TypeError):
-            continue
+        # Use the underlying_holdings_list property which handles JSON parsing
+        underlying_list = fund.underlying_holdings_list or []
         
         for uh in underlying_list:
             symbol = uh.get('symbol', '')

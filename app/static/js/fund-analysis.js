@@ -445,26 +445,52 @@ async function compareFund(symbol) {
     const chartContainer = document.getElementById('comparisonChartContainer');
     const chartTitle = document.getElementById('comparisonChartTitle');
     const legendContainer = document.getElementById('chartLegend');
+    const canvas = document.getElementById('comparisonChart');
     
     if (!chartContainer) return;
     
+    // Show container and loading state
     chartContainer.style.display = 'block';
     chartTitle.textContent = `Loading ${symbol} comparison...`;
-    legendContainer.innerHTML = '';
+    legendContainer.innerHTML = '<span class="loading-text"><i class="fas fa-spinner fa-spin"></i> Fetching NAV data...</span>';
+    
+    // CLEAR previous chart immediately
+    if (comparisonChart) {
+        comparisonChart.destroy();
+        comparisonChart = null;
+    }
+    
+    // Clear the canvas
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
     
     try {
+        console.log(`[Fund Compare] Fetching comparison for ${symbol}...`);
+        const startTime = Date.now();
+        
         const response = await fetch(`/api/fund-analysis/compare/${symbol}?days=365`);
         const data = await response.json();
+        
+        const elapsed = Date.now() - startTime;
+        console.log(`[Fund Compare] API response for ${symbol} in ${elapsed}ms:`, data.success ? 'success' : 'failed');
         
         if (!data.success) {
             throw new Error(data.error || 'Failed to load comparison');
         }
         
+        // Log what we got
+        const fundHasNav = data.data?.fund?.nav_history?.length > 0;
+        const peerCount = data.data?.peers?.filter(p => p.nav_history?.length > 0).length || 0;
+        console.log(`[Fund Compare] ${symbol}: fund NAV=${fundHasNav}, peers with NAV=${peerCount}`);
+        
         renderComparisonChart(data.data);
         
     } catch (error) {
-        console.error('Error comparing fund:', error);
+        console.error('[Fund Compare] Error:', error);
         chartTitle.textContent = `Error loading comparison for ${symbol}`;
+        legendContainer.innerHTML = `<span class="error-text">${error.message}</span>`;
     }
 }
 

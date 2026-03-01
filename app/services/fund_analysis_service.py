@@ -105,38 +105,33 @@ class FundAnalysisService:
                 """
                 Normalize expense ratio to decimal format.
                 
-                yfinance returns values inconsistently:
-                1. Some ETFs: 0.0003 meaning 0.03% (decimal format)
-                2. Some funds: 0.03 meaning 0.03% (percentage format, needs /100)
-                3. Some funds: 1.31 meaning 1.31% (percentage format, needs /100)
+                yfinance MOSTLY returns values in decimal format:
+                - 0.0003 = 0.03%
+                - 0.0106 = 1.06%
+                - 0.0131 = 1.31%
                 
-                Key insight: Real expense ratios range from 0.01% to 3.0%
-                - In decimal: 0.0001 to 0.03
-                - In percentage: 0.01 to 3.0
+                But sometimes returns percentage format (rare):
+                - 1.06 meaning 1.06% (needs /100)
                 
                 Strategy:
-                - If value >= 0.01 (1% or 0.01 depending on format), assume percentage
-                - If value < 0.01, it's definitely decimal format
+                - If value > 0.1 (would mean >10% expense ratio), it's percentage format
+                - Otherwise, assume decimal format (correct as-is)
                 
-                This means:
-                - 0.0003 -> 0.0003 (kept, 0.03%)
-                - 0.03 -> 0.0003 (÷100, was 0.03% in percentage form)
-                - 1.31 -> 0.0131 (÷100, was 1.31% in percentage form)
+                No real fund has >10% expense ratio, so any value > 0.1 must be percentage.
                 """
                 if raw_value <= 0:
                     return 0
                 
                 logger.info(f"    {symbol} [{source}]: raw = {raw_value}")
                 
-                # If >= 0.01, treat as percentage and divide by 100
-                # This handles: 0.03 (0.03%), 0.50 (0.50%), 1.31 (1.31%)
-                if raw_value >= 0.01:
+                # If > 0.1, it's definitely percentage format (no fund has >10% ER)
+                if raw_value > 0.1:
                     result = raw_value / 100
                     logger.info(f"    {symbol}: {raw_value} -> {result} (÷100, was percentage format)")
                     return result
                 else:
-                    # Value < 0.01: already in decimal format
-                    # Examples: 0.0003 = 0.03%, 0.005 = 0.5%
+                    # Value <= 0.1: already in decimal format
+                    # Examples: 0.0003 = 0.03%, 0.0106 = 1.06%, 0.03 = 3%
                     logger.info(f"    {symbol}: {raw_value} -> {raw_value} (kept, already decimal)")
                     return raw_value
             
@@ -653,9 +648,14 @@ class FundAnalysisService:
         Returns:
             DataFrame with date, nav, totalReturn columns
         """
+        import time
+        
         # Try mstarpy first if we have security_id
         if security_id:
             try:
+                logger.info(f"[NAV] Fetching from mstarpy: {security_id} (symbol={symbol})")
+                start_time = time.time()
+                
                 fund = ms.Funds(security_id)
                 
                 end_date = datetime.now()
@@ -667,24 +667,38 @@ class FundAnalysisService:
                     frequency="daily"
                 )
                 
+                elapsed = time.time() - start_time
+                
                 if history:
                     df = pd.DataFrame(history)
-                    logger.info(f"Got {len(df)} NAV records from mstarpy for {security_id}")
+                    logger.info(f"[NAV] mstarpy SUCCESS for {security_id}: {len(df)} records in {elapsed:.1f}s")
                     return df
+                else:
+                    logger.warning(f"[NAV] mstarpy returned empty for {security_id} in {elapsed:.1f}s")
                 
             except Exception as e:
-                logger.warning(f"mstarpy NAV failed for {security_id}: {e}")
+                elapsed = time.time() - start_time if 'start_time' in dir() else 0
+                error_msg = str(e)
+                # Check for 401 errors
+                if '401' in error_msg or 'Unauthorized' in error_msg:
+                    logger.warning(f"[NAV] mstarpy 401 AUTH ERROR for {security_id} in {elapsed:.1f}s - falling back to yfinance")
+                else:
+                    logger.warning(f"[NAV] mstarpy FAILED for {security_id} in {elapsed:.1f}s: {error_msg[:100]}")
         
         # Fallback to yfinance if we have symbol
         if symbol:
             try:
-                logger.info(f"Trying yfinance for {symbol} historical data...")
+                logger.info(f"[NAV] Fetching from yfinance: {symbol}")
+                start_time = time.time()
+                
                 ticker = yf.Ticker(symbol)
                 
                 end_date = datetime.now()
                 start_date = end_date - timedelta(days=days)
                 
                 hist = ticker.history(start=start_date, end=end_date, interval="1d")
+                
+                elapsed = time.time() - start_time
                 
                 if hist is not None and not hist.empty:
                     # Convert to NAV-like format
@@ -693,12 +707,16 @@ class FundAnalysisService:
                         'nav': hist['Close'].values,
                         'totalReturn': hist['Close'].values  # Use close price as proxy
                     })
-                    logger.info(f"Got {len(df)} price records from yfinance for {symbol}")
+                    logger.info(f"[NAV] yfinance SUCCESS for {symbol}: {len(df)} records in {elapsed:.1f}s")
                     return df
+                else:
+                    logger.warning(f"[NAV] yfinance returned empty for {symbol} in {elapsed:.1f}s")
                     
             except Exception as e:
-                logger.warning(f"yfinance history failed for {symbol}: {e}")
+                elapsed = time.time() - start_time if 'start_time' in dir() else 0
+                logger.warning(f"[NAV] yfinance FAILED for {symbol} in {elapsed:.1f}s: {str(e)[:100]}")
         
+        logger.error(f"[NAV] ALL METHODS FAILED for security_id={security_id}, symbol={symbol}")
         return None
     
     def compare_fund_performance(
