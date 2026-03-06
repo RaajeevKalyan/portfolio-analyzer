@@ -26,13 +26,15 @@ upload_bp = Blueprint('upload', __name__)
 ALLOWED_EXTENSIONS = {'csv'}
 
 # Broker parser mapping
+from app.services.etrade_csv_parser import ETradeCSVParser
+
 PARSERS = {
     'merrill': MerrillCSVParser,
     'fidelity': FidelityCSVParser,
+    'etrade': ETradeCSVParser,
     # Add more as we implement them:
     # 'webull': WebullCSVParser,
     # 'schwab': SchwabCSVParser,
-    # etc.
 }
 
 
